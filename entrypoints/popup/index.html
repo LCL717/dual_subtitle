@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dul Subtitle</title>
+  </head>
+  <body>
+    <main>
+      <header><span class="eyebrow">DUL SUBTITLE</span><span class="badge">开发预览</span></header>
+      <h1>让两种语言，同时出现。</h1>
+      <p class="intro">从当前影片的字幕中选择两种语言，按你的习惯排列。</p>
+      <section class="connection" aria-labelledby="connection-heading">
+        <h2 id="connection-heading">播放器状态</h2>
+        <p id="status" role="status">正在检测当前页面…</p>
+        <button id="refresh" type="button">重新检测</button>
+      </section>
+      <div class="language-grid">
+        <label>上方字幕<select disabled aria-describedby="pending"><option>待接入影片语言列表</option></select></label>
+        <label>下方字幕<select disabled aria-describedby="pending"><option>待接入影片语言列表</option></select></label>
+      </div>
+      <p id="pending" class="hint">字幕获取正在开发，当前还不能在 Netflix 上显示双语字幕。</p>
+      <section aria-labelledby="preview-heading">
+        <h2 id="preview-heading">样式预览 <span class="hint">示例文字</span></h2>
+        <div class="preview"><p id="upper-preview">Your first subtitle language.</p><p id="lower-preview">这里显示你选择的第二种语言。</p></div>
+        <label class="slider-label" for="font-size">字幕字号 <output id="font-size-value" for="font-size">24 px</output></label>
+        <input id="font-size" type="range" min="16" max="36" step="1" value="24" disabled />
+        <p id="settings-status" class="hint" role="status">正在读取本机设置…</p>
+      </section>
+      <button class="primary" disabled>开启双语字幕 · 敬请期待</button>
+      <footer>语言由当前影片决定 · 设置仅保存在本机</footer>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

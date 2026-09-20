@@ -1,0 +1,20 @@
+{
+  "name": "dul-subtitle",
+  "description": "Netflix dual subtitle extension for Chrome and Edge",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:edge": "wxt -b edge",
+    "build": "wxt build",
+    "build:edge": "wxt build -b edge",
+    "zip": "wxt zip",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "wxt": "^0.21.4"
+  }
+}

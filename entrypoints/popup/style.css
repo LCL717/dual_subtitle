@@ -1,0 +1,29 @@
+:root { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; color: #eff3fc; background: #10141e; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; width: 380px; }
+main { padding: 24px; }
+header { display: flex; align-items: center; justify-content: space-between; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 2px; color: #b1c4ff; }
+.badge { padding: 4px 8px; border: 1px solid #39425b; border-radius: 20px; font-size: 11px; color: #c4cce0; }
+h1 { font-size: 22px; margin: 22px 0 10px; letter-spacing: -0.5px; }
+h2 { font-size: 13px; margin: 0 0 10px; }
+p { line-height: 1.65; }
+.intro, #status { font-size: 13px; color: #b9c3d8; }
+.connection { margin: 20px 0; padding: 15px; border: 1px solid #30394e; border-radius: 12px; background: #181f2d; }
+#status { margin: 0 0 12px; }
+button, select { font: inherit; border-radius: 7px; padding: 8px 10px; border: 1px solid #485672; background: #222d42; color: #e3eaff; }
+button { cursor: pointer; }
+button:disabled, select:disabled { cursor: not-allowed; opacity: .65; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #b4c7ff; outline-offset: 3px; }
+.language-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+label { font-size: 12px; color: #c8d2e7; }
+select { display: block; width: 100%; margin-top: 8px; font-size: 11px; }
+.hint { font-size: 11px; color: #a7b4cc; font-weight: normal; }
+#pending { margin: 12px 0 22px; }
+.preview { padding: 20px 12px; background: #080d16; border: 1px solid #2a3448; border-radius: 12px; text-align: center; overflow-wrap: anywhere; }
+.preview p { margin: 5px 0; line-height: 1.45; }
+#lower-preview { color: #c9d9ff; }
+.slider-label { display: flex; justify-content: space-between; margin-top: 16px; }
+input[type="range"] { width: 100%; margin: 12px 0 0; accent-color: #a7beff; }
+.primary { width: 100%; margin-top: 12px; padding: 12px; background: #344b86; }
+footer { text-align: center; color: #94a3bf; font-size: 10px; margin-top: 18px; }
