@@ -16,13 +16,7 @@ const refresh = element<HTMLButtonElement>('refresh');
 const size = element<HTMLInputElement>('font-size');
 const settingsStatus = element('settings-status');
 const SETTINGS_KEY = 'dul-subtitle:font-size';
-const diagnostics = document.createElement('pre');
-diagnostics.className = 'hint';
-diagnostics.style.whiteSpace = 'pre-wrap';
-diagnostics.style.overflowWrap = 'anywhere';
-diagnostics.setAttribute('aria-live', 'polite');
-refresh.after(diagnostics);
-let inspectionCount = 0;
+const diagnostics = element('diagnostics');
 const upperLanguage = element<HTMLSelectElement>('upper-language');
 const lowerLanguage = element<HTMLSelectElement>('lower-language');
 let availableTracks: SubtitleTrack[] = [];
@@ -43,7 +37,7 @@ function updateStartButton() {
 function displayDual(value: unknown) {
   if (!isDualState(value)) throw new Error('扩展状态不兼容，请重新加载并刷新 Netflix。');
   loading = value.phase === 'loading';
-  dualStatus.textContent = value.detail;
+  dualStatus.textContent = value.phase === 'active' ? '双语字幕已开启。' : value.detail;
   updateStartButton();
 }
 async function pollDual(version: number) {
@@ -118,8 +112,9 @@ resourceButton.addEventListener('click', async () => {
     ]);
     if (generation !== resourceGeneration) return;
     if (!isResourceReport(report)) throw new Error('返回结果不兼容，请重新加载扩展并刷新 Netflix。');
-    resourceResult.textContent = [report.detail, ...report.tracks.map(track =>
-      `${track.label}\n资源字段：${track.hasDownloadMetadata ? '有' : '未发现'}；内嵌时间轴：${track.hasInlineCues ? '有' : '未发现'}\n格式：${track.profiles.join(', ') || '未知'}\n轨道结构：${track.fields.join(', ')}\n资源结构：${track.resourceFields.join(', ') || '无'}`)].join('\n\n');
+    resourceResult.textContent = report.state === 'unavailable' ? report.detail : report.tracks.map(track =>
+      `${track.label}：${track.hasDownloadMetadata ? '发现资源信息' : '未发现资源信息'}（${track.profiles.join(', ') || '格式未知'}）`
+    ).join('\n') + '\n资源信息可用于排查，能否播放以开启后的结果为准。';
   } catch (error) {
     if (generation === resourceGeneration) resourceResult.textContent = `资源检查失败：${error instanceof Error ? error.message : String(error)}`;
   } finally {
@@ -134,9 +129,7 @@ async function inspectPlayer() {
   statusVersion++; clearTimeout(statusTimer);
   showTracks();
   status.textContent = '正在检测当前页面…';
-  inspectionCount += 1;
-  const attempt = `第 ${inspectionCount} 次检测 · ${new Date().toLocaleTimeString()}`;
-  diagnostics.textContent = attempt;
+  diagnostics.textContent = '';
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     if (location.protocol !== 'chrome-extension:') {
@@ -165,19 +158,20 @@ async function inspectPlayer() {
     if (snapshot.isWatchPage && snapshot.hasVideo) showTracks(report);
     if (['loading', 'active'].includes(snapshot.dual.phase)) void pollDual(statusVersion);
     const current = report.tracks.find(track => track.id === report.currentTrackId);
-    diagnostics.textContent = `${attempt}\n页面脚本：已连接\n视频元素：${snapshot.hasVideo ? '已找到' : '未找到'}\n字幕读取：${report.state}\n当前字幕：${current?.label ?? '未识别（不表示关闭）'}\n${report.detail}`;
+    diagnostics.textContent = report.state === 'ready'
+      ? `Netflix 当前字幕：${current?.label ?? '未识别'}。`
+      : report.detail;
     status.textContent = !snapshot.isWatchPage
       ? '已连接 Netflix，请进入一部影片的播放页面。'
       : !snapshot.hasVideo
         ? '已进入播放页，等待播放器加载后请重新检测。'
         : report.state === 'ready'
-          ? `已读到 ${report.tracks.length} 条字幕轨道。请核对语言列表。`
-          : '已找到播放器，Netflix 字幕列表尚未读取成功。';
+          ? '已连接 Netflix，可以选择两种字幕语言。'
+          : report.detail;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     status.textContent = '检测失败。请在 Netflix 播放页打开扩展；若刚安装或更新，请先刷新 Netflix，并检查扩展是否获准访问此网站。';
-    diagnostics.textContent = `${attempt}\n错误详情：${detail}`;
-    console.error('[Dul Subtitle] 播放器检测失败', error);
+    diagnostics.textContent = `错误详情：${detail}`;
   } finally {
     if (timeout !== undefined) clearTimeout(timeout);
     refresh.disabled = false;
@@ -197,7 +191,7 @@ async function loadSettings() {
     const saved: unknown = result[SETTINGS_KEY];
     updatePreview(typeof saved === 'number' && Number.isInteger(saved)
       && saved >= 16 && saved <= 36 ? saved : 24);
-    settingsStatus.textContent = '此设置目前仅应用于上方预览。';
+    settingsStatus.textContent = '调整后重新开启双语字幕以应用字号。';
   } catch {
     settingsStatus.textContent = '设置读取失败，暂时使用默认字号。';
   } finally {
@@ -213,7 +207,7 @@ size.addEventListener('change', () => {
   saveQueue = saveQueue.then(async () => {
     try {
       await browser.storage.local.set({ [SETTINGS_KEY]: value });
-      settingsStatus.textContent = '字号已保存到本机，目前仅用于预览。';
+      settingsStatus.textContent = '字号已保存，重新开启双语字幕后生效。';
     } catch {
       settingsStatus.textContent = '保存失败，请再次调整字号重试。';
     }

@@ -20,8 +20,6 @@
         <label>下方字幕<select id="lower-language" disabled aria-describedby="pending"><option>等待读取影片语言</option></select></label>
       </div>
       <p id="pending" class="hint">正在检测字幕列表，实验版需要两条可下载的文本轨道。</p>
-      <button id="inspect-resources" type="button" disabled>检查所选字幕资源</button>
-      <pre id="resource-result" class="hint" role="status" style="white-space: pre-wrap; overflow-wrap: anywhere"></pre>
       <section aria-labelledby="preview-heading">
         <h2 id="preview-heading">样式预览 <span class="hint">示例文字</span></h2>
         <div class="preview"><p id="upper-preview">Your first subtitle language.</p><p id="lower-preview">这里显示你选择的第二种语言。</p></div>
@@ -32,6 +30,12 @@
       <button id="start-dual" class="primary" disabled>开启双语字幕（实验版）</button>
       <button id="stop-dual" class="primary" type="button">关闭并恢复原生字幕</button>
       <p id="dual-status" class="hint" role="status">双语字幕未开启。</p>
+      <details class="troubleshooting">
+        <summary>连接与字幕排查</summary>
+        <pre id="diagnostics" class="hint" aria-live="polite"></pre>
+        <button id="inspect-resources" type="button" disabled>检查所选字幕资源</button>
+        <pre id="resource-result" class="hint" role="status"></pre>
+      </details>
       <footer>语言由当前影片决定 · 设置仅保存在本机</footer>
     </main>
     <script type="module" src="./main.ts"></script>

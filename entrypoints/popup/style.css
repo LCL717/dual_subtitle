@@ -27,3 +27,7 @@ select { display: block; width: 100%; margin-top: 8px; font-size: 11px; }
 input[type="range"] { width: 100%; margin: 12px 0 0; accent-color: #a7beff; }
 .primary { width: 100%; margin-top: 12px; padding: 12px; background: #344b86; }
 footer { text-align: center; color: #94a3bf; font-size: 10px; margin-top: 18px; }
+.troubleshooting { margin-top: 16px; border-top: 1px solid #30394e; padding-top: 12px; }
+.troubleshooting summary { cursor: pointer; color: #a7b4cc; font-size: 12px; }
+.troubleshooting pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.troubleshooting summary:focus-visible { outline: 2px solid #b4c7ff; outline-offset: 3px; }

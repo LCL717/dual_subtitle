@@ -4,11 +4,11 @@ Chrome / Edge 的 Netflix 双语字幕扩展，使用 WXT + TypeScript + 原生 
 
 ## 当前进度
 
-已实现实验性的字幕加载与上下双语叠加。用户已验证能找到 Japanese [SDH] 和 English [SDH] 两条 imsc1.1 字幕地址；新版真实下载和双语显示仍待 Netflix 页面实测。
+已实现实验性的字幕加载与上下双语叠加。用户已在当前 Netflix 影片上确认 Japanese [SDH] 与 English [SDH] 双语显示成功。其他影片、语言组合及浏览器场景仍需扩展验收。
 
 1. 在扩展管理页重新加载扩展，再刷新 Netflix。
 2. 打开扩展，重新检测，选择上下两种不同语言。
-3. 点击“开启双语字幕（实验版）”，等待结果；成功时显示两轨段落数量。
+3. 点击“开启双语字幕（实验版）”，等待结果；成功时显示“双语字幕已开启”。
 4. 回到视频检查同步、暂停、拖动和全屏。
 5. 点击“关闭并恢复原生字幕”退出。下载或解析失败时保留原生字幕，错误显示在按钮下方。
 
@@ -63,7 +63,7 @@ npm.cmd run zip
 
 - `wxt.config.ts`：WXT 和扩展配置；manifest.json 由 WXT 生成。
 - `entrypoints/popup/`：工具栏弹窗界面与设置。
-- `entrypoints/netflix.content.ts`：只在 Netflix 页面运行的检测代码。
+- `entrypoints/netflix.content.ts`：Netflix 页面检测、字幕加载协调与叠加层生命周期。
 - `lib/protocol.ts`：弹窗与页面间的消息约定。
 - `PLAN.md`：最终需求与分阶段计划。
 - `docs/feasibility.md`：双轨字幕可行性状态。
@@ -72,13 +72,24 @@ npm.cmd run zip
 
 ## 权限
 
-目前仅申请 storage，用于保存预览字号；内容脚本仅匹配 `https://www.netflix.com/*`。当前不读取 Cookie，不上传数据，不修改 Netflix 原生字幕，也不请求所有网站权限。
+目前仅申请 storage，用于保存预览字号；内容脚本仅匹配 `https://www.netflix.com/*`。当前不读取 Cookie，不上传数据，不切换 Netflix 原生字幕轨道，也不请求所有网站权限。双轨就绪后通过临时样式隐藏原生字幕，关闭时移除样式恢复。
 
 ## 开发资料
 
 - [WXT 安装与从零创建项目](https://wxt.dev/guide/installation)
 - [WXT 入口文件约定](https://wxt.dev/guide/essentials/entrypoints)
 - [Chrome 本地加载扩展](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world)
-## 当前需要验证的步骤
 
-更新扩展并刷新 Netflix，重新检测后选择两种不同语言，点击“检查所选字幕资源”。请记录结果；该功能仅检查字段结构，尚不下载或显示双轨字幕。
+## 问题排查
+
+通常只需选择两种语言并开启。遇到问题时，展开弹窗底部的“连接与字幕排查”，查看连接详情或检查所选字幕资源。诊断检查仅检查资源信息，不启动字幕播放。
+
+## 后续优先级
+
+1. 保存语言偏好，并在重新打开弹窗时恢复当前选择与播放状态。
+2. 切集后重新匹配语言并自动加载；缺少语言时提示选择。
+3. 字号即时生效，增加上下独立字号、底部位置与背景设置。
+4. 扩充多影片、多语言、全屏、跳片头、暂停、拖动、倍速及 Chrome / Edge 验收。
+5. 根据实际影片增加字幕格式支持，改善资源查找性能与失败重试。
+
+发布扩展商店、图标与安装包完善放在功能稳定之后。
