@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
-import { INSPECT_PLAYER, INSPECT_RESOURCES, isPlayerSnapshot } from '../../lib/protocol';
+import { INSPECT_PLAYER, INSPECT_RESOURCES, START_DUAL, STOP_DUAL, DUAL_STATUS, isPlayerSnapshot } from '../../lib/protocol';
+import { isDualState } from '../../lib/dual';
 import { isResourceReport } from '../../lib/subtitle-resources';
 import './style.css';
 import type { SubtitleTrack, TrackReport } from '../../lib/netflix-tracks';
@@ -29,19 +30,62 @@ let inspectedTabId: number | undefined;
 let resourceGeneration = 0;
 const resourceButton = element<HTMLButtonElement>('inspect-resources');
 const resourceResult = element('resource-result');
+const startButton = element<HTMLButtonElement>('start-dual');
+const dualStatus = element('dual-status');
+let statusTimer: ReturnType<typeof setTimeout> | undefined;
+let statusVersion = 0;
+let loading = false;
+function updateStartButton() {
+  const a = availableTracks.find(track => track.id === upperLanguage.value);
+  const b = availableTracks.find(track => track.id === lowerLanguage.value);
+  startButton.disabled = loading || !(a && b && a.language !== b.language);
+}
+function displayDual(value: unknown) {
+  if (!isDualState(value)) throw new Error('扩展状态不兼容，请重新加载并刷新 Netflix。');
+  loading = value.phase === 'loading';
+  dualStatus.textContent = value.detail;
+  updateStartButton();
+}
+async function pollDual(version: number) {
+  if (inspectedTabId === undefined || version !== statusVersion) return;
+  try {
+    const value: unknown = await browser.tabs.sendMessage(inspectedTabId, { type: DUAL_STATUS }, { frameId: 0 });
+    if (version !== statusVersion) return;
+    displayDual(value);
+    if (isDualState(value) && ['loading', 'active'].includes(value.phase)) statusTimer = setTimeout(() => { void pollDual(version); }, 700);
+  } catch { if (version === statusVersion) { loading = false; updateStartButton(); dualStatus.textContent = '连接中断，请刷新 Netflix 后重新检测。'; } }
+}
+for (const [button, type] of [[startButton, START_DUAL], [element('stop-dual'), STOP_DUAL]] as const) {
+  button.addEventListener('click', async () => {
+    if (inspectedTabId === undefined) { dualStatus.textContent = '请先重新检测播放器。'; return; }
+    const version = ++statusVersion;
+    clearTimeout(statusTimer);
+    loading = type === START_DUAL; updateStartButton();
+    try {
+      const value: unknown = await browser.tabs.sendMessage(inspectedTabId, {
+        type, ids: [upperLanguage.value, lowerLanguage.value], fontSize: Number(size.value),
+      }, { frameId: 0 });
+      if (version !== statusVersion) return;
+      displayDual(value);
+      if (type === START_DUAL) void pollDual(version);
+    } catch { if (version === statusVersion) { loading = false; updateStartButton(); dualStatus.textContent = '操作失败，请刷新 Netflix 后重新检测。'; } }
+  });
+}
+window.addEventListener('pagehide', () => { statusVersion++; clearTimeout(statusTimer); });
 
 function showTracks(report?: TrackReport) {
   resourceGeneration++;
   resourceButton.disabled = true;
   resourceResult.textContent = '';
   availableTracks = report?.state === 'ready' ? report.tracks : [];
+  startButton.disabled = true;
   for (const select of [upperLanguage, lowerLanguage]) {
     select.replaceChildren(new Option(availableTracks.length ? '请选择语言' : '尚未读到字幕列表', ''));
     for (const track of availableTracks) select.add(new Option(track.label, track.id));
     select.disabled = availableTracks.length === 0;
   }
   element('pending').textContent = availableTracks.length
-    ? '可选择上下字幕语言进行核对；当前选择仅用于本次预览，不更改 Netflix 字幕，双语显示尚未实现。'
+    ? '选择两种不同语言后可尝试开启双语字幕。两条字幕准备成功后才隐藏原生字幕。'
     : '字幕列表尚不可用，请查看播放器状态。';
 }
 
@@ -51,10 +95,11 @@ function checkSelection() {
   const upper = availableTracks.find(track => track.id === upperLanguage.value);
   const lower = availableTracks.find(track => track.id === lowerLanguage.value);
   resourceButton.disabled = !(upper && lower && upper.language !== lower.language);
+  updateStartButton();
   element('pending').textContent = upper && lower
     ? upper.language === lower.language
       ? '请选择两种不同语言；同语言的普通字幕和 SDH 不算两种语言。'
-      : `已选上方：${upper.label}；下方：${lower.label}。本次预览有效，双语显示尚未实现。`
+      : `已选上方：${upper.label}；下方：${lower.label}。点击开启以应用此组合。`
     : '请分别选择上方和下方语言。选择不会更改 Netflix 当前字幕。';
 }
 upperLanguage.addEventListener('change', checkSelection);
@@ -86,6 +131,7 @@ resourceButton.addEventListener('click', async () => {
 async function inspectPlayer() {
   refresh.disabled = true;
   inspectedTabId = undefined;
+  statusVersion++; clearTimeout(statusTimer);
   showTracks();
   status.textContent = '正在检测当前页面…';
   inspectionCount += 1;
@@ -115,7 +161,9 @@ async function inspectPlayer() {
     if (!isPlayerSnapshot(snapshot)) throw new Error('页面返回了空或不兼容的检测结果，请重新加载扩展并刷新 Netflix。');
     const report = snapshot.subtitles;
     inspectedTabId = tab.id;
+    displayDual(snapshot.dual);
     if (snapshot.isWatchPage && snapshot.hasVideo) showTracks(report);
+    if (['loading', 'active'].includes(snapshot.dual.phase)) void pollDual(statusVersion);
     const current = report.tracks.find(track => track.id === report.currentTrackId);
     diagnostics.textContent = `${attempt}\n页面脚本：已连接\n视频元素：${snapshot.hasVideo ? '已找到' : '未找到'}\n字幕读取：${report.state}\n当前字幕：${current?.label ?? '未识别（不表示关闭）'}\n${report.detail}`;
     status.textContent = !snapshot.isWatchPage

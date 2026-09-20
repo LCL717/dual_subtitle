@@ -1,6 +1,10 @@
 import { isTrackReport, type TrackReport } from './netflix-tracks';
+import { isDualState, type DualState } from './dual';
 export const INSPECT_PLAYER = 'dul-subtitle:inspect-player';
 export const INSPECT_RESOURCES = 'dul-subtitle:inspect-resources';
+export const START_DUAL = 'dul-subtitle:start';
+export const STOP_DUAL = 'dul-subtitle:stop';
+export const DUAL_STATUS = 'dul-subtitle:status';
 
 export interface PlayerSnapshot {
   isWatchPage: boolean;
@@ -8,6 +12,7 @@ export interface PlayerSnapshot {
   textTrackCount: number;
   integration: 'pending';
   subtitles: TrackReport;
+  dual: DualState;
 }
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
@@ -18,5 +23,6 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && Number.isInteger(data.textTrackCount)
     && (data.textTrackCount as number) >= 0
     && data.integration === 'pending'
-    && isTrackReport(data.subtitles);
+    && isTrackReport(data.subtitles)
+    && isDualState(data.dual);
 }

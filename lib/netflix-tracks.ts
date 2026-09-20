@@ -100,7 +100,7 @@ export function inspectNetflixTracks(netflix: unknown): TrackReport {
       const id = text(current?.trackId) || text(current?.id);
       currentTrackId = selected.tracks.some(track => track.id === id) ? id : null;
     } catch { /* Current track is optional; never infer it from the first track. */ }
-    return { state: 'ready', tracks: selected.tracks, currentTrackId, detail: '已读取播放器字幕列表，请与 Netflix 字幕菜单核对。双轨字幕内容尚未接入。' };
+    return { state: 'ready', tracks: selected.tracks, currentTrackId, detail: '已读取播放器字幕列表，请与 Netflix 字幕菜单核对。可选择两种语言并尝试开启实验版。' };
   } catch {
     return { state: 'error', tracks: [], currentTrackId: null, detail: 'Netflix 内部字幕接口不可用或结构已变化；没有更改原生字幕。' };
   }
