@@ -11,7 +11,7 @@ export interface TrackReport {
   detail: string;
 }
 
-function record(value: unknown): Record<string, unknown> | undefined {
+export function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' ? value as Record<string, unknown> : undefined;
 }
 
@@ -22,25 +22,54 @@ function text(value: unknown): string {
 export function normalizeTracks(raw: unknown): SubtitleTrack[] {
   if (!Array.isArray(raw) || raw.length > 200) return [];
   const seen = new Set<string>();
-  return raw.flatMap((item): SubtitleTrack[] => {
+  const tracks = raw.flatMap((item): SubtitleTrack[] => {
     const track = record(item);
     if (!track || track.isNoneTrack === true || track.isForcedNarrative === true) return [];
     const id = text(track.trackId) || text(track.id);
     const language = text(track.bcp47) || text(track.language);
     if (!id || !language || /^(none|off)$/i.test(id) || seen.has(id)) return [];
     const rawLabel = text(track.displayName) || text(track.languageDescription) || language;
-    const kind = text(track.trackType).toLowerCase();
+    const kind = text(track.rawTrackType || track.trackType).toLowerCase();
     if (kind === 'none' || kind === 'forced') return [];
-    const label = kind === 'sdh' && !/sdh/i.test(rawLabel) ? `${rawLabel} [SDH]` : rawLabel;
+    const caption = ['sdh', 'closedcaptions', 'closed_captions'].includes(kind);
+    const label = caption && !/sdh|\bcc\b/i.test(rawLabel) ? `${rawLabel} [SDH]` : rawLabel;
     seen.add(id);
     return [{ id, language, label }];
   });
+  const counts = new Map<string, number>();
+  for (const track of tracks) counts.set(track.label, (counts.get(track.label) ?? 0) + 1);
+  const ordinal = new Map<string, number>();
+  return tracks.map(track => {
+    if (counts.get(track.label) === 1) return track;
+    const number = (ordinal.get(track.label) ?? 0) + 1;
+    ordinal.set(track.label, number);
+    // When Netflix doesn't describe a variant, don't guess its meaning.
+    return { ...track, label: `${track.label.slice(0, 190)} [轨道 ${number}]` };
+  });
 }
 
-function invoke(target: unknown, name: string, ...args: unknown[]): unknown {
+export function invoke(target: unknown, name: string, ...args: unknown[]): unknown {
   const method = record(target)?.[name];
   if (typeof method !== 'function') throw new Error('Unsupported player API');
   return method.apply(target, args);
+}
+
+export function getTrackPlayers(netflix: unknown): { player: unknown; raw: unknown[]; tracks: SubtitleTrack[] }[] {
+  const app = record(record(netflix)?.appContext);
+  const state = record(record(app?.state)?.playerApp);
+  if (!state) return [];
+  const api = record(invoke(state, 'getAPI'))?.videoPlayer;
+  const sessions = invoke(api, 'getAllPlayerSessionIds');
+  if (!Array.isArray(sessions) || sessions.length > 20) return [];
+  return sessions.flatMap(id => {
+    if (typeof id !== 'string') return [];
+    try {
+      const player = invoke(api, 'getVideoPlayerBySessionId', id);
+      const raw = invoke(player, 'getTimedTextTrackList');
+      const tracks = normalizeTracks(raw);
+      return Array.isArray(raw) && tracks.length ? [{ player, raw, tracks }] : [];
+    } catch { return []; }
+  });
 }
 
 // Experimental read-only adapter. Netflix does not document this private API.

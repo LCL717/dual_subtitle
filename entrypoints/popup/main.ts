@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
-import { INSPECT_PLAYER, isPlayerSnapshot } from '../../lib/protocol';
+import { INSPECT_PLAYER, INSPECT_RESOURCES, isPlayerSnapshot } from '../../lib/protocol';
+import { isResourceReport } from '../../lib/subtitle-resources';
 import './style.css';
 import type { SubtitleTrack, TrackReport } from '../../lib/netflix-tracks';
 
@@ -24,8 +25,15 @@ let inspectionCount = 0;
 const upperLanguage = element<HTMLSelectElement>('upper-language');
 const lowerLanguage = element<HTMLSelectElement>('lower-language');
 let availableTracks: SubtitleTrack[] = [];
+let inspectedTabId: number | undefined;
+let resourceGeneration = 0;
+const resourceButton = element<HTMLButtonElement>('inspect-resources');
+const resourceResult = element('resource-result');
 
 function showTracks(report?: TrackReport) {
+  resourceGeneration++;
+  resourceButton.disabled = true;
+  resourceResult.textContent = '';
   availableTracks = report?.state === 'ready' ? report.tracks : [];
   for (const select of [upperLanguage, lowerLanguage]) {
     select.replaceChildren(new Option(availableTracks.length ? '请选择语言' : '尚未读到字幕列表', ''));
@@ -38,8 +46,11 @@ function showTracks(report?: TrackReport) {
 }
 
 function checkSelection() {
+  resourceGeneration++;
+  resourceResult.textContent = '';
   const upper = availableTracks.find(track => track.id === upperLanguage.value);
   const lower = availableTracks.find(track => track.id === lowerLanguage.value);
+  resourceButton.disabled = !(upper && lower && upper.language !== lower.language);
   element('pending').textContent = upper && lower
     ? upper.language === lower.language
       ? '请选择两种不同语言；同语言的普通字幕和 SDH 不算两种语言。'
@@ -48,9 +59,33 @@ function checkSelection() {
 }
 upperLanguage.addEventListener('change', checkSelection);
 lowerLanguage.addEventListener('change', checkSelection);
+resourceButton.addEventListener('click', async () => {
+  if (inspectedTabId === undefined) return;
+  const generation = ++resourceGeneration;
+  resourceButton.disabled = true;
+  resourceResult.textContent = '正在检查两条轨道的资源结构…';
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const report: unknown = await Promise.race([
+      browser.tabs.sendMessage(inspectedTabId, { type: INSPECT_RESOURCES,
+        ids: [upperLanguage.value, lowerLanguage.value] }, { frameId: 0 }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('资源检查超时')), 5000); }),
+    ]);
+    if (generation !== resourceGeneration) return;
+    if (!isResourceReport(report)) throw new Error('返回结果不兼容，请重新加载扩展并刷新 Netflix。');
+    resourceResult.textContent = [report.detail, ...report.tracks.map(track =>
+      `${track.label}\n资源字段：${track.hasDownloadMetadata ? '有' : '未发现'}；内嵌时间轴：${track.hasInlineCues ? '有' : '未发现'}\n格式：${track.profiles.join(', ') || '未知'}\n轨道结构：${track.fields.join(', ')}\n资源结构：${track.resourceFields.join(', ') || '无'}`)].join('\n\n');
+  } catch (error) {
+    if (generation === resourceGeneration) resourceResult.textContent = `资源检查失败：${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    if (generation === resourceGeneration) resourceButton.disabled = false;
+  }
+});
 
 async function inspectPlayer() {
   refresh.disabled = true;
+  inspectedTabId = undefined;
   showTracks();
   status.textContent = '正在检测当前页面…';
   inspectionCount += 1;
@@ -79,6 +114,7 @@ async function inspectPlayer() {
     ]);
     if (!isPlayerSnapshot(snapshot)) throw new Error('页面返回了空或不兼容的检测结果，请重新加载扩展并刷新 Netflix。');
     const report = snapshot.subtitles;
+    inspectedTabId = tab.id;
     if (snapshot.isWatchPage && snapshot.hasVideo) showTracks(report);
     const current = report.tracks.find(track => track.id === report.currentTrackId);
     diagnostics.textContent = `${attempt}\n页面脚本：已连接\n视频元素：${snapshot.hasVideo ? '已找到' : '未找到'}\n字幕读取：${report.state}\n当前字幕：${current?.label ?? '未识别（不表示关闭）'}\n${report.detail}`;

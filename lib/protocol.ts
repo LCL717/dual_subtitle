@@ -1,5 +1,6 @@
 import { isTrackReport, type TrackReport } from './netflix-tracks';
 export const INSPECT_PLAYER = 'dul-subtitle:inspect-player';
+export const INSPECT_RESOURCES = 'dul-subtitle:inspect-resources';
 
 export interface PlayerSnapshot {
   isWatchPage: boolean;

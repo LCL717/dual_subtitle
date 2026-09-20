@@ -69,3 +69,6 @@ npm.cmd run zip
 - [WXT 安装与从零创建项目](https://wxt.dev/guide/installation)
 - [WXT 入口文件约定](https://wxt.dev/guide/essentials/entrypoints)
 - [Chrome 本地加载扩展](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world)
+## 当前需要验证的步骤
+
+更新扩展并刷新 Netflix，重新检测后选择两种不同语言，点击“检查所选字幕资源”。请记录结果；该功能仅检查字段结构，尚不下载或显示双轨字幕。

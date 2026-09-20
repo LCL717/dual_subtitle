@@ -20,6 +20,8 @@
         <label>下方字幕<select id="lower-language" disabled aria-describedby="pending"><option>等待读取影片语言</option></select></label>
       </div>
       <p id="pending" class="hint">字幕获取正在开发，当前还不能在 Netflix 上显示双语字幕。</p>
+      <button id="inspect-resources" type="button" disabled>检查所选字幕资源</button>
+      <pre id="resource-result" class="hint" role="status" style="white-space: pre-wrap; overflow-wrap: anywhere"></pre>
       <section aria-labelledby="preview-heading">
         <h2 id="preview-heading">样式预览 <span class="hint">示例文字</span></h2>
         <div class="preview"><p id="upper-preview">Your first subtitle language.</p><p id="lower-preview">这里显示你选择的第二种语言。</p></div>
