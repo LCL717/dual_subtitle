@@ -194,3 +194,8 @@ dul_subtitle/
 2. [Microsoft：Port a Chrome extension to Microsoft Edge](https://learn.microsoft.com/en-us/microsoft-edge/extensions/developer-guide/port-chrome-extension)
 3. [Netflix：How to use subtitles, captions, or choose audio language](https://help.netflix.com/en/node/372)
 4. [Chrome：Manifest file format](https://developer.chrome.com/docs/extensions/reference/manifest)
+
+## 开发进展：字幕列表探测
+
+已增加实验性 Netflix 私有播放器只读适配和 MAIN world 桥接。语言列表读取成功后可进行上下选择预览；不保存语言偏好，不改变原生字幕。六项模拟测试和两款浏览器构建通过，真实语言菜单一致性及双轨内容获取仍待验证。
+

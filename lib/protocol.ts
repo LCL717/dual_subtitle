@@ -1,3 +1,4 @@
+import { isTrackReport, type TrackReport } from './netflix-tracks';
 export const INSPECT_PLAYER = 'dul-subtitle:inspect-player';
 
 export interface PlayerSnapshot {
@@ -5,6 +6,7 @@ export interface PlayerSnapshot {
   hasVideo: boolean;
   textTrackCount: number;
   integration: 'pending';
+  subtitles: TrackReport;
 }
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
@@ -14,5 +16,6 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && typeof data.hasVideo === 'boolean'
     && Number.isInteger(data.textTrackCount)
     && (data.textTrackCount as number) >= 0
-    && data.integration === 'pending';
+    && data.integration === 'pending'
+    && isTrackReport(data.subtitles);
 }

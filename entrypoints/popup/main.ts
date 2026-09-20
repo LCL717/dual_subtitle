@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import { INSPECT_PLAYER, isPlayerSnapshot } from '../../lib/protocol';
 import './style.css';
+import type { SubtitleTrack, TrackReport } from '../../lib/netflix-tracks';
 
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
@@ -20,9 +21,37 @@ diagnostics.style.overflowWrap = 'anywhere';
 diagnostics.setAttribute('aria-live', 'polite');
 refresh.after(diagnostics);
 let inspectionCount = 0;
+const upperLanguage = element<HTMLSelectElement>('upper-language');
+const lowerLanguage = element<HTMLSelectElement>('lower-language');
+let availableTracks: SubtitleTrack[] = [];
+
+function showTracks(report?: TrackReport) {
+  availableTracks = report?.state === 'ready' ? report.tracks : [];
+  for (const select of [upperLanguage, lowerLanguage]) {
+    select.replaceChildren(new Option(availableTracks.length ? '请选择语言' : '尚未读到字幕列表', ''));
+    for (const track of availableTracks) select.add(new Option(track.label, track.id));
+    select.disabled = availableTracks.length === 0;
+  }
+  element('pending').textContent = availableTracks.length
+    ? '可选择上下字幕语言进行核对；当前选择仅用于本次预览，不更改 Netflix 字幕，双语显示尚未实现。'
+    : '字幕列表尚不可用，请查看播放器状态。';
+}
+
+function checkSelection() {
+  const upper = availableTracks.find(track => track.id === upperLanguage.value);
+  const lower = availableTracks.find(track => track.id === lowerLanguage.value);
+  element('pending').textContent = upper && lower
+    ? upper.language === lower.language
+      ? '请选择两种不同语言；同语言的普通字幕和 SDH 不算两种语言。'
+      : `已选上方：${upper.label}；下方：${lower.label}。本次预览有效，双语显示尚未实现。`
+    : '请分别选择上方和下方语言。选择不会更改 Netflix 当前字幕。';
+}
+upperLanguage.addEventListener('change', checkSelection);
+lowerLanguage.addEventListener('change', checkSelection);
 
 async function inspectPlayer() {
   refresh.disabled = true;
+  showTracks();
   status.textContent = '正在检测当前页面…';
   inspectionCount += 1;
   const attempt = `第 ${inspectionCount} 次检测 · ${new Date().toLocaleTimeString()}`;
@@ -49,12 +78,17 @@ async function inspectPlayer() {
       }),
     ]);
     if (!isPlayerSnapshot(snapshot)) throw new Error('页面返回了空或不兼容的检测结果，请重新加载扩展并刷新 Netflix。');
-    diagnostics.textContent = `${attempt}\n页面脚本：已连接\n视频元素：${snapshot.hasVideo ? '已找到' : '未找到'}\n标准字幕轨道：${snapshot.textTrackCount}（不代表 Netflix 完整语言列表）`;
+    const report = snapshot.subtitles;
+    if (snapshot.isWatchPage && snapshot.hasVideo) showTracks(report);
+    const current = report.tracks.find(track => track.id === report.currentTrackId);
+    diagnostics.textContent = `${attempt}\n页面脚本：已连接\n视频元素：${snapshot.hasVideo ? '已找到' : '未找到'}\n字幕读取：${report.state}\n当前字幕：${current?.label ?? '未识别（不表示关闭）'}\n${report.detail}`;
     status.textContent = !snapshot.isWatchPage
       ? '已连接 Netflix，请进入一部影片的播放页面。'
       : !snapshot.hasVideo
         ? '已进入播放页，等待播放器加载后请重新检测。'
-        : '已检测到 Netflix 视频。双语字幕功能仍在开发中。';
+        : report.state === 'ready'
+          ? `已读到 ${report.tracks.length} 条字幕轨道。请核对语言列表。`
+          : '已找到播放器，Netflix 字幕列表尚未读取成功。';
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     status.textContent = '检测失败。请在 Netflix 播放页打开扩展；若刚安装或更新，请先刷新 Netflix，并检查扩展是否获准访问此网站。';
