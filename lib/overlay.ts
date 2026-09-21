@@ -1,5 +1,6 @@
 import { createTimeline, type Cue } from './timeline.ts';
 import { normalizeStyle, TEXT_SHADOW, type SubtitleStyle } from './subtitle-style.ts';
+import { fontStack } from './fonts.ts';
 
 export interface OverlayClock { read(): number | null; invalidate(): void }
 export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void, clock?: OverlayClock, onSync?: (waiting: boolean) => void, getStyle?: () => SubtitleStyle): () => void {
@@ -48,6 +49,7 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
         host.style.setProperty('--subtitle-background', `rgba(0,0,0,${style.backgroundOpacity / 100})`);
         lines.forEach(line => {
           line.style.fontSize = `${style.fontSize}px`;
+          line.style.fontFamily = fontStack(style.fontFamily);
           line.style.textShadow = style.shadow ? TEXT_SHADOW : 'none';
         });
       }

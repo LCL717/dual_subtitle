@@ -1,0 +1,7 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #10141e; color: #eff3fc; }
+main { max-width: 760px; margin: 48px auto; padding: 24px; }
+p { line-height: 1.7; color: #b9c3d8; }
+button { padding: 10px 16px; margin: 4px; border: 1px solid #485672; border-radius: 8px; color: inherit; background: #222d42; cursor: pointer; }
+button:disabled { opacity: .6; cursor: wait; }
+ul { columns: 2; line-height: 1.8; overflow-wrap: anywhere; }
+button:focus-visible { outline: 2px solid #a7beff; outline-offset: 3px; }

@@ -4,6 +4,7 @@ import { isDualState } from '../../lib/dual';
 import { isResourceReport } from '../../lib/subtitle-resources';
 import './style.css';
 import type { SubtitleTrack, TrackReport } from '../../lib/netflix-tracks';
+import { FONT_LIST_KEY, FALLBACK_FONTS, normalizeFontList, fontStack, fontLabel } from '../../lib/fonts';
 import { STYLE_KEY, LEGACY_SIZE_KEY, DEFAULT_STYLE, normalizeStyle, TEXT_SHADOW, type SubtitleStyle } from '../../lib/subtitle-style';
 
 function element<T extends HTMLElement>(id: string): T {
@@ -19,6 +20,35 @@ const settingsStatus = element('settings-status');
 const background = element<HTMLInputElement>('background-opacity');
 const shadow = element<HTMLInputElement>('text-shadow');
 const resetStyle = element<HTMLButtonElement>('reset-style');
+const fontFamily = element<HTMLSelectElement>('font-family');
+let fontNames: string[] = [];
+function fontOption(label: string, value: string) {
+  const option = new Option(label, value);
+  option.style.fontFamily = fontStack(value);
+  return option;
+}
+function showFonts(selected: string) {
+  fontFamily.replaceChildren(...FALLBACK_FONTS.map(([value, label]) => fontOption(label, value)));
+  const installed = document.createElement('optgroup'); installed.label = '本机字体（上次读取）';
+  for (const name of fontNames) installed.append(fontOption(fontLabel(name), name));
+  if (fontNames.length) fontFamily.append(installed);
+  if (selected && !Array.from(fontFamily.options).some(option => option.value === selected))
+    fontFamily.add(fontOption(`${fontLabel(selected)}（已保存，当前列表未确认）`, selected));
+  fontFamily.value = selected;
+  fontFamily.style.fontFamily = fontStack(selected);
+}
+element('read-fonts').addEventListener('click', () => {
+  void browser.tabs.create({ url: browser.runtime.getURL('/fonts.html') }).catch(() => {
+    element('font-note').textContent = '无法打开字体设置页，请重新加载扩展后重试。';
+  });
+});
+const onFontsChanged = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+  if (area !== 'local' || !(FONT_LIST_KEY in changes)) return;
+  fontNames = normalizeFontList(changes[FONT_LIST_KEY]?.newValue);
+  showFonts(fontFamily.value);
+};
+browser.storage.onChanged.addListener(onFontsChanged);
+window.addEventListener('pagehide', () => browser.storage.onChanged.removeListener(onFontsChanged));
 const diagnostics = element('diagnostics');
 const upperLanguage = element<HTMLSelectElement>('upper-language');
 const lowerLanguage = element<HTMLSelectElement>('lower-language');
@@ -187,6 +217,7 @@ async function inspectPlayer() {
 }
 
 function updatePreview(style: SubtitleStyle) {
+  showFonts(style.fontFamily);
   size.value = String(style.fontSize);
   background.value = String(style.backgroundOpacity);
   shadow.checked = style.shadow;
@@ -195,6 +226,7 @@ function updatePreview(style: SubtitleStyle) {
   for (const id of ['upper-preview', 'lower-preview']) {
     const preview = element(id);
     preview.style.fontSize = `${style.fontSize}px`;
+    preview.style.fontFamily = fontStack(style.fontFamily);
     preview.style.textShadow = style.shadow ? TEXT_SHADOW : 'none';
     preview.style.backgroundColor = `rgba(0,0,0,${style.backgroundOpacity / 100})`;
   }
@@ -202,7 +234,8 @@ function updatePreview(style: SubtitleStyle) {
 
 async function loadSettings() {
   try {
-    const result = await browser.storage.local.get([STYLE_KEY, LEGACY_SIZE_KEY]);
+    const result = await browser.storage.local.get([STYLE_KEY, LEGACY_SIZE_KEY, FONT_LIST_KEY]);
+    fontNames = normalizeFontList(result[FONT_LIST_KEY]);
     updatePreview(normalizeStyle(result[STYLE_KEY] ?? { fontSize: result[LEGACY_SIZE_KEY] }));
     settingsStatus.textContent = '设置自动保存，并实时应用到已开启的双语字幕。';
   } catch {
@@ -212,13 +245,14 @@ async function loadSettings() {
     background.disabled = false;
     shadow.disabled = false;
     resetStyle.disabled = false;
+    fontFamily.disabled = false;
   }
 }
 
 // Serialize writes so quick changes cannot leave an older preference saved last.
 let saveQueue = Promise.resolve();
 function saveStyle() {
-  const value = normalizeStyle({ fontSize: Number(size.value), backgroundOpacity: Number(background.value), shadow: shadow.checked });
+  const value = normalizeStyle({ fontSize: Number(size.value), backgroundOpacity: Number(background.value), shadow: shadow.checked, fontFamily: fontFamily.value });
   updatePreview(value);
   saveQueue = saveQueue.then(async () => {
     try {
@@ -232,6 +266,7 @@ function saveStyle() {
 size.addEventListener('input', saveStyle);
 background.addEventListener('input', saveStyle);
 shadow.addEventListener('change', saveStyle);
+fontFamily.addEventListener('change', saveStyle);
 resetStyle.addEventListener('click', () => { updatePreview(DEFAULT_STYLE); saveStyle(); });
 updatePreview(DEFAULT_STYLE);
 refresh.addEventListener('click', () => { void inspectPlayer(); });

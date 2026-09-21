@@ -23,6 +23,10 @@
       <section aria-labelledby="preview-heading">
         <h2 id="preview-heading">样式预览 <span class="hint">示例文字</span></h2>
         <div class="preview"><p id="upper-preview">Your first subtitle language.</p><p id="lower-preview">这里显示你选择的第二种语言。</p></div>
+        <label class="slider-label" for="font-family">字体（上下字幕共用）</label>
+        <select id="font-family" disabled aria-describedby="font-note"><option value="">系统默认</option></select>
+        <button id="read-fonts" type="button">读取本机字体…</button>
+        <p id="font-note" class="hint">在独立设置页授权读取后更新列表；不支持时仍可使用系统备用字体。</p>
         <label class="slider-label" for="font-size">字幕字号 <output id="font-size-value" for="font-size">24 px</output></label>
         <input id="font-size" type="range" min="16" max="36" step="1" value="24" disabled />
         <label class="slider-label" for="background-opacity">字幕背景 <output id="background-value" for="background-opacity">透明</output></label>
