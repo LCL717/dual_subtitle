@@ -1,5 +1,9 @@
 # Dul Subtitle
 
+界面支持简体中文 / English：在弹窗或字体设置页顶部切换。首次根据浏览器语言选择（中文浏览器使用中文，其余使用英文），手动选择后保存在本机，两页下次打开时使用同一设置。切换会刷新当前扩展界面，不会关闭双语字幕；建议先应用正在编辑的字幕组合。字幕内容、Netflix 语言名称及本机字体原名不随界面语言改变。
+
+首版 v0.1.0 已提供 Chrome / Edge 本地安装包；安装、升级与已知限制见 [发行说明](docs/releases/v0.1.0.md)。使用 `npm.cmd run zip` 和 `npm.cmd run zip:edge` 分别生成 `.output/` 下的浏览器压缩包。
+
 Chrome / Edge 的 Netflix 双语字幕扩展，使用 WXT + TypeScript + 原生 HTML/CSS。
 
 ## 当前进度
