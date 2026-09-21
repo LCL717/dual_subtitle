@@ -2,6 +2,7 @@ import { defineContentScript } from 'wxt/utils/define-content-script';
 import { inspectNetflixTracks } from '../lib/netflix-tracks';
 import { inspectPlayerResources } from '../lib/subtitle-resources';
 import { loadSubtitles } from '../lib/load-subtitles';
+import { readPlaybackSample, hasVisibleAd } from '../lib/playback-clock';
 
 export default defineContentScript({
   matches: ['https://www.netflix.com/*'],
@@ -12,8 +13,15 @@ export default defineContentScript({
     window.addEventListener('message', (event: MessageEvent) => {
       if (event.source !== window || event.origin !== location.origin) return;
       const message = event.data;
-      if (!message || !['dul:tracks-request:v1', 'dul:resources-request:v1', 'dul:load-request:v1', 'dul:cancel-load:v1'].includes(message.type)
+      if (!message || !['dul:tracks-request:v1', 'dul:resources-request:v1', 'dul:load-request:v1', 'dul:cancel-load:v1', 'dul:clock-request:v1'].includes(message.type)
         || typeof message.id !== 'string' || message.id.length > 80) return;
+      if (message.type === 'dul:clock-request:v1') {
+        if (message.path !== location.pathname) return;
+        const sample = readPlaybackSample((window as unknown as Record<string, unknown>).netflix,
+          location.pathname, hasVisibleAd(document));
+        window.postMessage({ type: 'dul:clock-response:v1', id: message.id, path: location.pathname, sample }, location.origin);
+        return;
+      }
       if (message.type === 'dul:cancel-load:v1') { loadController?.abort(); return; }
       if (message.type === 'dul:load-request:v1') {
         if (message.path !== location.pathname || !Array.isArray(message.ids) || message.ids.length !== 2

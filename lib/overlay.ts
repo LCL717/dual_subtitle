@@ -1,6 +1,7 @@
 import { createTimeline, type Cue } from './timeline.ts';
 
-export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void): () => void {
+export interface OverlayClock { read(): number | null; invalidate(): void }
+export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void, clock?: OverlayClock, onSync?: (waiting: boolean) => void): () => void {
   const queries = tracks.map(createTimeline);
   const path = location.pathname;
   const host = document.createElement('div');
@@ -21,20 +22,43 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
   nativeStyle.textContent = '.player-timedtext { visibility: hidden !important; }';
   let stopped = false;
   let timer: ReturnType<typeof setInterval> | undefined;
+  const events = ['seeked', 'seeking', 'timeupdate', 'pause', 'play', 'ratechange', 'loadedmetadata', 'emptied'];
+  function mediaEvent(event: Event) {
+    if (['seeked', 'seeking', 'loadedmetadata', 'emptied'].includes(event.type)) clock?.invalidate();
+    render();
+  }
   const stop = () => {
     if (stopped) return;
     stopped = true;
     clearInterval(timer);
     host.remove(); nativeStyle.remove();
-    for (const name of ['seeked', 'seeking', 'timeupdate', 'pause', 'play', 'ratechange']) video.removeEventListener(name, render);
+    for (const name of events) video.removeEventListener(name, mediaEvent);
     document.removeEventListener('fullscreenchange', render);
   };
   const fail = (reason: string) => { stop(); onStop(reason); };
   function render() {
     if (stopped) return;
     try {
-      if (location.pathname !== path || !video.isConnected || document.querySelector('video') !== video) {
+      if (location.pathname !== path) {
         fail('影片或播放器已切换，已恢复原生字幕；请重新选择并开启。'); return;
+      }
+      const time = clock ? clock.read() : video.currentTime;
+      if (time === null) {
+        onSync?.(true);
+        host.hidden = true;
+        lines.forEach(line => line.replaceChildren());
+        nativeStyle.remove();
+        return;
+      }
+      onSync?.(false);
+      const currentVideo = document.querySelector('video');
+      if (!currentVideo) { host.hidden = true; nativeStyle.remove(); return; }
+      if (currentVideo !== video) {
+        if (!clock) { fail('播放器已切换，请重新开启。'); return; }
+        for (const name of events) video.removeEventListener(name, mediaEvent);
+        video = currentVideo;
+        for (const name of events) video.addEventListener(name, mediaEvent);
+        clock.invalidate(); host.hidden = true; nativeStyle.remove(); return;
       }
       const parent = document.fullscreenElement ?? document.documentElement;
       if (parent === video) { fail('当前全屏模式无法叠加字幕，已恢复原生字幕。'); return; }
@@ -44,9 +68,11 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
       host.style.width = `${rect.width * .9}px`;
       host.style.bottom = `${Math.max(0, innerHeight - rect.bottom) + Math.max(65, rect.height * .1)}px`;
       host.hidden = rect.width === 0 || rect.height === 0;
+      if (host.hidden) nativeStyle.remove();
+      else if (!nativeStyle.isConnected) document.documentElement.append(nativeStyle);
       queries.forEach((query, index) => {
         const line = lines[index]!;
-        const text = query(video.currentTime).join('\n');
+        const text = query(time).join('\n');
         if (line.textContent === text) return;
         line.replaceChildren();
         if (text) { const span = document.createElement('span'); span.textContent = text; line.append(span); }
@@ -55,9 +81,8 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
   }
   render();
   if (!stopped) {
-    document.documentElement.append(nativeStyle);
     timer = setInterval(render, 100);
-    for (const name of ['seeked', 'seeking', 'timeupdate', 'pause', 'play', 'ratechange']) video.addEventListener(name, render);
+    for (const name of events) video.addEventListener(name, mediaEvent);
     document.addEventListener('fullscreenchange', render);
   }
   return stop;

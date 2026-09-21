@@ -37,7 +37,7 @@ function updateStartButton() {
 function displayDual(value: unknown) {
   if (!isDualState(value)) throw new Error('扩展状态不兼容，请重新加载并刷新 Netflix。');
   loading = value.phase === 'loading';
-  dualStatus.textContent = value.phase === 'active' ? '双语字幕已开启。' : value.detail;
+  dualStatus.textContent = value.detail;
   updateStartButton();
 }
 async function pollDual(version: number) {

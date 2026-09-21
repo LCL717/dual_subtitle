@@ -35,6 +35,33 @@ test('overlay follows seek, preserves text safety and restores native visibility
     assert.equal(shadow.querySelector('.lower').textContent, '');
     stop(); stop();
     assert.equal(window.getComputedStyle(native).visibility, originalVisibility);
+    // Ad media time must not determine the subtitle cue. Missing/ad clock
+    // restores native captions; the next content sample resynchronizes unaided.
+    let contentTime = 2;
+    const clock = { read: () => contentTime, invalidate: () => { contentTime = null; } };
+    stop = mountOverlay(video, tracks, 24, () => {}, clock);
+    video.currentTime = 200;
+    video.dispatchEvent(new window.Event('timeupdate'));
+    assert.equal(shadow.querySelector('.lower').textContent, 'English');
+    contentTime = null;
+    video.dispatchEvent(new window.Event('timeupdate'));
+    assert.equal(shadow.querySelector('.lower').textContent, '');
+    assert.equal(window.getComputedStyle(native).visibility, originalVisibility);
+    contentTime = 2;
+    video.dispatchEvent(new window.Event('timeupdate'));
+    assert.equal(shadow.querySelector('.lower').textContent, 'English');
+    assert.equal(window.getComputedStyle(native).visibility, 'hidden');
+    // A replacement video after the ad is rebound and needs a fresh clock.
+    const replacement = window.document.createElement('video');
+    replacement.getBoundingClientRect = video.getBoundingClientRect;
+    video.replaceWith(replacement);
+    video.dispatchEvent(new window.Event('timeupdate'));
+    assert.equal(contentTime, null);
+    contentTime = 1;
+    replacement.dispatchEvent(new window.Event('timeupdate'));
+    assert.equal(shadow.querySelector('.lower').textContent, '');
+    stop();
+    replacement.replaceWith(video);
     let reason = '';
     stop = mountOverlay(video, tracks, 24, message => { reason = message; });
     window.location.href = 'https://www.netflix.com/watch/456';

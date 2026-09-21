@@ -3,6 +3,7 @@ import { defineContentScript } from 'wxt/utils/define-content-script';
 import { INSPECT_PLAYER, INSPECT_RESOURCES, START_DUAL, STOP_DUAL, DUAL_STATUS, type PlayerSnapshot } from '../lib/protocol';
 import { isSubtitlePayload, type DualState } from '../lib/dual';
 import { mountOverlay } from '../lib/overlay';
+import { connectPlaybackClock } from '../lib/clock-bridge';
 import { isResourceReport, type ResourceReport } from '../lib/subtitle-resources';
 import { isTrackReport, type TrackReport } from '../lib/netflix-tracks';
 
@@ -42,8 +43,14 @@ export default defineContentScript({
         if (!isSubtitlePayload(data.payload)) {
           dual = { phase: 'error', detail: typeof data.error === 'string' ? data.error.slice(0, 300) : '字幕数据格式无效。' }; return;
         }
-        dual = { phase: 'active', detail: `双语字幕已开启（${data.payload.tracks.map((track: unknown[]) => track.length).join(' / ')} 段）。` };
-        removeOverlay = mountOverlay(video, data.payload.tracks, fontSize, detail => { dual = { phase: 'error', detail }; });
+        dual = { phase: 'active', detail: '双语字幕已开启。' };
+        const clock = connectPlaybackClock();
+        const unmount = mountOverlay(video, data.payload.tracks, fontSize, detail => {
+          clock.stop(); dual = { phase: 'error', detail };
+        }, clock, waiting => {
+          dual = { phase: 'active', detail: waiting ? '广告期间或正片时间未就绪，暂用原生字幕；时间恢复后自动同步。' : '双语字幕已开启。' };
+        });
+        removeOverlay = () => { unmount(); clock.stop(); };
       };
       const timer = setTimeout(() => {
         clean();
