@@ -55,7 +55,7 @@ export default defineContentScript({
         }).finally(() => { resourceBusy = false; });
         return;
       }
-      const report = inspectNetflixTracks((window as unknown as Record<string, unknown>).netflix);
+      const report = inspectNetflixTracks((window as unknown as Record<string, unknown>).netflix, /^\/watch\/(\d+)/.exec(location.pathname)?.[1]);
       window.postMessage({ type: 'dul:tracks-response:v1', id: message.id, report }, location.origin);
     });
   },

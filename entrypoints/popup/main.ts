@@ -159,6 +159,11 @@ async function inspectPlayer() {
     inspectedTabId = tab.id;
     displayDual(snapshot.dual);
     if (snapshot.isWatchPage && snapshot.hasVideo) showTracks(report);
+    if (Array.isArray(snapshot.selection) && snapshot.selection.length === 2) {
+      upperLanguage.value = snapshot.selection[0] ?? '';
+      lowerLanguage.value = snapshot.selection[1] ?? '';
+      checkSelection();
+    }
     if (['loading', 'active'].includes(snapshot.dual.phase)) void pollDual(statusVersion);
     const current = report.tracks.find(track => track.id === report.currentTrackId);
     diagnostics.textContent = report.state === 'ready'

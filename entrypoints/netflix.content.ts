@@ -7,6 +7,7 @@ import { connectPlaybackClock } from '../lib/clock-bridge';
 import { STYLE_KEY, LEGACY_SIZE_KEY, normalizeStyle } from '../lib/subtitle-style';
 import { isResourceReport, type ResourceReport } from '../lib/subtitle-resources';
 import { isTrackReport, type TrackReport } from '../lib/netflix-tracks';
+import { PREFERENCES_KEY, readPreferences, preferenceFor, matchPreferences, type Preferences } from '../lib/subtitle-preferences';
 
 export default defineContentScript({
   matches: ['https://www.netflix.com/*'],
@@ -27,10 +28,67 @@ export default defineContentScript({
     let generation = 0;
     let removeOverlay: (() => void) | undefined;
     let cancelPending: (() => void) | undefined;
+    let preferences: Preferences | undefined;
+    let preferencesReady = false;
+    let preferenceVersion = 0;
+    let savedQueue = Promise.resolve();
+    let pagePath = location.pathname;
+    let restoreUntil = Date.now() + 90000;
+    let restoreBusy = false;
+    let restoreAttempts = 0;
+    let retryAt = 0;
+    let disposed = false;
+    let activeSelection: [string, string] | undefined;
+    const preferencesLoaded = browser.storage.local.get(PREFERENCES_KEY).then(saved => {
+      if (!preferences) preferences = readPreferences(saved[PREFERENCES_KEY]);
+    }).catch(() => {}).finally(() => { preferencesReady = true; });
+    function savePreferences() {
+      const value = preferences;
+      if (!value) return;
+      savedQueue = savedQueue.then(async () => {
+        try { await browser.storage.local.set({ [PREFERENCES_KEY]: value }); }
+        catch { dual = { ...dual, detail: dual.detail + ' 语言偏好保存失败，请稍后重试。' }; }
+      });
+    }
+    async function restore() {
+      if (disposed) return;
+      if (pagePath !== location.pathname) {
+        pagePath = location.pathname;
+        stop(); activeSelection = undefined;
+        preferenceVersion++;
+        restoreUntil = Date.now() + 90000; restoreAttempts = 0; retryAt = 0;
+      }
+      if (!preferencesReady || !preferences?.enabled || restoreBusy || dual.phase === 'loading' || dual.phase === 'active'
+        || Date.now() < retryAt || restoreAttempts >= 3 || !/^\/watch\/\d+/.test(pagePath)) return;
+      if (Date.now() > restoreUntil) {
+        if (dual.phase === 'off') dual = { phase: 'error', detail: '自动恢复等待超时，请在播放器就绪后重新开启。' };
+        return;
+      }
+      restoreBusy = true;
+      const path = pagePath;
+      const version = preferenceVersion;
+      try {
+        const report = await inspectTracks();
+        if (disposed || version !== preferenceVersion || path !== location.pathname || !preferences?.enabled) return;
+        if (report.state !== 'ready' || !document.querySelector('video')) {
+          dual = { phase: 'off', detail: '正在等待播放器，字幕将自动恢复。' }; return;
+        }
+        const ids = matchPreferences(report.tracks, preferences);
+        if (!ids[0] || !ids[1]) {
+          dual = { phase: 'error', detail: '当前影片缺少已保存的语言或字幕变体，或存在多个匹配项，请重新选择。' };
+          retryAt = Date.now() + 5000; return;
+        }
+        inspectedPath = path;
+        restoreAttempts++;
+        retryAt = Date.now() + 8000;
+        start([ids[0], ids[1]], style.fontSize);
+      } finally { restoreBusy = false; }
+    }
     function stop() {
       generation++;
       cancelPending?.(); cancelPending = undefined;
       removeOverlay?.(); removeOverlay = undefined;
+      activeSelection = undefined;
       window.postMessage({ type: 'dul:cancel-load:v1', id: crypto.randomUUID() }, location.origin);
       dual = { phase: 'off', detail: '双语字幕已关闭，原生字幕已恢复。' };
     }
@@ -43,6 +101,7 @@ export default defineContentScript({
         dual = { phase: 'error', detail: '请在播放页重新检测后开启。' }; return;
       }
       dual = { phase: 'loading', detail: '正在下载并解析两条字幕…' };
+      activeSelection = [ids[0]!, ids[1]!];
       const id = crypto.randomUUID();
       const clean = () => { clearTimeout(timer); window.removeEventListener('message', receive); cancelPending = undefined; };
       const receive = (event: MessageEvent) => {
@@ -124,14 +183,37 @@ export default defineContentScript({
     const listener = (message: unknown, sender: { id?: string }, sendResponse: (response: PlayerSnapshot | ResourceReport | DualState) => void) => {
       if (sender.id !== browser.runtime.id || !message || typeof message !== 'object'
         || !('type' in message)) return;
-      if (message.type === STOP_DUAL) { stop(); sendResponse(dual); return; }
+      if (message.type === STOP_DUAL) {
+        const version = ++preferenceVersion;
+        stop();
+        void preferencesLoaded.then(() => {
+          if (version === preferenceVersion && preferences) { preferences = { ...preferences, enabled: false }; savePreferences(); }
+          sendResponse(dual);
+        });
+        return true;
+      }
       if (message.type === DUAL_STATUS) { sendResponse(dual); return; }
       if (message.type === START_DUAL) {
         if (!('ids' in message) || !Array.isArray(message.ids) || message.ids.length !== 2
           || !message.ids.every(id => typeof id === 'string' && id.length <= 200)) return;
         const size = 'fontSize' in message && typeof message.fontSize === 'number' ? message.fontSize : 24;
-        start(message.ids, Number.isFinite(size) ? Math.max(16, Math.min(36, size)) : 24);
-        sendResponse(dual); return;
+        const ids = message.ids as string[];
+        const version = ++preferenceVersion;
+        const path = location.pathname;
+        void inspectTracks().then(report => {
+          if (disposed || version !== preferenceVersion || path !== location.pathname) { sendResponse(dual); return; }
+          const tracks = ids.map(id => report.tracks.find(track => track.id === id));
+          if (report.state !== 'ready' || tracks.some(track => !track) || tracks[0]!.language === tracks[1]!.language) {
+            sendResponse({ phase: 'error', detail: '字幕列表已变化，请重新检测并选择。' }); return;
+          }
+          preferences = { enabled: true, upper: preferenceFor(tracks[0]!), lower: preferenceFor(tracks[1]!) };
+          preferencesReady = true; savePreferences();
+          inspectedPath = path; pagePath = path;
+          restoreUntil = Date.now() + 90000; restoreAttempts = 1; retryAt = Date.now() + 8000;
+          start(ids, Number.isFinite(size) ? Math.max(16, Math.min(36, size)) : 24);
+          sendResponse(dual);
+        });
+        return true;
       }
       if (message.type === INSPECT_RESOURCES) {
         if (!('ids' in message) || !Array.isArray(message.ids) || message.ids.length !== 2
@@ -148,10 +230,13 @@ export default defineContentScript({
         textTrackCount: video?.textTracks.length ?? 0,
         integration: 'pending' as const,
       };
-      void inspectTracks().then(subtitles => sendResponse({ ...snapshot, subtitles, dual }));
+      void inspectTracks().then(subtitles => sendResponse({ ...snapshot, subtitles, dual,
+        selection: activeSelection ?? (preferences ? matchPreferences(subtitles.tracks, preferences) : [null, null]),
+      }));
       return true; // Keep the response channel open on Chromium.
     };
     browser.runtime.onMessage.addListener(listener);
-    ctx.onInvalidated(() => { stop(); browser.runtime.onMessage.removeListener(listener); browser.storage.onChanged.removeListener(onStyleChange); });
+    const restoreTimer = setInterval(() => { void restore(); }, 1000);
+    ctx.onInvalidated(() => { disposed = true; clearInterval(restoreTimer); stop(); browser.runtime.onMessage.removeListener(listener); browser.storage.onChanged.removeListener(onStyleChange); });
   },
 });

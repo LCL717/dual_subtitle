@@ -13,6 +13,7 @@ export interface PlayerSnapshot {
   integration: 'pending';
   subtitles: TrackReport;
   dual: DualState;
+  selection?: [string | null, string | null];
 }
 
 export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {

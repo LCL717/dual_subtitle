@@ -2,6 +2,7 @@ export interface SubtitleTrack {
   id: string;
   language: string;
   label: string;
+  variant?: string;
 }
 
 export interface TrackReport {
@@ -34,7 +35,8 @@ export function normalizeTracks(raw: unknown): SubtitleTrack[] {
     const caption = ['sdh', 'closedcaptions', 'closed_captions'].includes(kind);
     const label = caption && !/sdh|\bcc\b/i.test(rawLabel) ? `${rawLabel} [SDH]` : rawLabel;
     seen.add(id);
-    return [{ id, language, label }];
+    const variant = typeof track.variant === 'number' ? String(track.variant) : text(track.variant);
+    return [{ id, language, label, variant }];
   });
   const counts = new Map<string, number>();
   for (const track of tracks) counts.set(track.label, (counts.get(track.label) ?? 0) + 1);
@@ -74,7 +76,7 @@ export function getTrackPlayers(netflix: unknown): { player: unknown; raw: unkno
 
 // Experimental read-only adapter. Netflix does not document this private API.
 // No track switching, network interception, or raw player objects cross the bridge.
-export function inspectNetflixTracks(netflix: unknown): TrackReport {
+export function inspectNetflixTracks(netflix: unknown, movieId?: string): TrackReport {
   const unavailable = (detail: string): TrackReport => ({ state: 'unavailable', tracks: [], currentTrackId: null, detail });
   try {
     const app = record(record(netflix)?.appContext);
@@ -94,6 +96,8 @@ export function inspectNetflixTracks(netflix: unknown): TrackReport {
     if (players.length > 1) return { state: 'ambiguous', tracks: [], currentTrackId: null, detail: '检测到多个字幕播放器，暂不猜测当前影片，请关闭预览后重试。' };
     const selected = players[0];
     if (!selected) return unavailable('未读到可识别的字幕列表。请打开 Netflix 字幕菜单后重新检测。');
+    if (movieId && typeof record(selected.player)?.getMovieId === 'function'
+      && String(invoke(selected.player, 'getMovieId')) !== movieId) return unavailable('正在等待新影片播放器。');
     let currentTrackId: string | null = null;
     try {
       const current = record(invoke(selected.player, 'getTimedTextTrack'));
@@ -114,7 +118,7 @@ export function isTrackReport(value: unknown): value is TrackReport {
     || !Array.isArray(report.tracks) || report.tracks.length > 200) return false;
   return report.tracks.every((item: unknown) => {
     const track = record(item);
-    return track && ['id', 'language', 'label'].every(key => typeof track[key] === 'string'
+    return track && (track.variant === undefined || (typeof track.variant === 'string' && track.variant.length <= 200)) && ['id', 'language', 'label'].every(key => typeof track[key] === 'string'
       && (track[key] as string).length > 0 && (track[key] as string).length <= 210);
   });
 }
