@@ -4,6 +4,7 @@ import { isDualState } from '../../lib/dual';
 import { isResourceReport } from '../../lib/subtitle-resources';
 import './style.css';
 import type { SubtitleTrack, TrackReport } from '../../lib/netflix-tracks';
+import { STYLE_KEY, LEGACY_SIZE_KEY, DEFAULT_STYLE, normalizeStyle, TEXT_SHADOW, type SubtitleStyle } from '../../lib/subtitle-style';
 
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
@@ -15,7 +16,9 @@ const status = element('status');
 const refresh = element<HTMLButtonElement>('refresh');
 const size = element<HTMLInputElement>('font-size');
 const settingsStatus = element('settings-status');
-const SETTINGS_KEY = 'dul-subtitle:font-size';
+const background = element<HTMLInputElement>('background-opacity');
+const shadow = element<HTMLInputElement>('text-shadow');
+const resetStyle = element<HTMLButtonElement>('reset-style');
 const diagnostics = element('diagnostics');
 const upperLanguage = element<HTMLSelectElement>('upper-language');
 const lowerLanguage = element<HTMLSelectElement>('lower-language');
@@ -178,41 +181,54 @@ async function inspectPlayer() {
   }
 }
 
-function updatePreview(fontSize: number) {
-  size.value = String(fontSize);
-  element('font-size-value').textContent = `${fontSize} px`;
-  element('upper-preview').style.fontSize = `${fontSize}px`;
-  element('lower-preview').style.fontSize = `${fontSize}px`;
+function updatePreview(style: SubtitleStyle) {
+  size.value = String(style.fontSize);
+  background.value = String(style.backgroundOpacity);
+  shadow.checked = style.shadow;
+  element('font-size-value').textContent = `${style.fontSize} px`;
+  element('background-value').textContent = style.backgroundOpacity ? `${style.backgroundOpacity}%` : '透明';
+  for (const id of ['upper-preview', 'lower-preview']) {
+    const preview = element(id);
+    preview.style.fontSize = `${style.fontSize}px`;
+    preview.style.textShadow = style.shadow ? TEXT_SHADOW : 'none';
+    preview.style.backgroundColor = `rgba(0,0,0,${style.backgroundOpacity / 100})`;
+  }
 }
 
 async function loadSettings() {
   try {
-    const result = await browser.storage.local.get(SETTINGS_KEY);
-    const saved: unknown = result[SETTINGS_KEY];
-    updatePreview(typeof saved === 'number' && Number.isInteger(saved)
-      && saved >= 16 && saved <= 36 ? saved : 24);
-    settingsStatus.textContent = '调整后重新开启双语字幕以应用字号。';
+    const result = await browser.storage.local.get([STYLE_KEY, LEGACY_SIZE_KEY]);
+    updatePreview(normalizeStyle(result[STYLE_KEY] ?? { fontSize: result[LEGACY_SIZE_KEY] }));
+    settingsStatus.textContent = '设置自动保存，并实时应用到已开启的双语字幕。';
   } catch {
     settingsStatus.textContent = '设置读取失败，暂时使用默认字号。';
   } finally {
     size.disabled = false;
+    background.disabled = false;
+    shadow.disabled = false;
+    resetStyle.disabled = false;
   }
 }
 
-size.addEventListener('input', () => updatePreview(Number(size.value)));
 // Serialize writes so quick changes cannot leave an older preference saved last.
 let saveQueue = Promise.resolve();
-size.addEventListener('change', () => {
-  const value = Number(size.value);
+function saveStyle() {
+  const value = normalizeStyle({ fontSize: Number(size.value), backgroundOpacity: Number(background.value), shadow: shadow.checked });
+  updatePreview(value);
   saveQueue = saveQueue.then(async () => {
     try {
-      await browser.storage.local.set({ [SETTINGS_KEY]: value });
-      settingsStatus.textContent = '字号已保存，重新开启双语字幕后生效。';
+      await browser.storage.local.set({ [STYLE_KEY]: value });
+      settingsStatus.textContent = '样式已保存，已开启的字幕会实时更新。';
     } catch {
-      settingsStatus.textContent = '保存失败，请再次调整字号重试。';
+      settingsStatus.textContent = '保存失败，请重新调整样式重试。';
     }
   });
-});
+}
+size.addEventListener('input', saveStyle);
+background.addEventListener('input', saveStyle);
+shadow.addEventListener('change', saveStyle);
+resetStyle.addEventListener('click', () => { updatePreview(DEFAULT_STYLE); saveStyle(); });
+updatePreview(DEFAULT_STYLE);
 refresh.addEventListener('click', () => { void inspectPlayer(); });
 void loadSettings();
 void inspectPlayer();

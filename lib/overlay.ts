@@ -1,14 +1,15 @@
 import { createTimeline, type Cue } from './timeline.ts';
+import { normalizeStyle, TEXT_SHADOW, type SubtitleStyle } from './subtitle-style.ts';
 
 export interface OverlayClock { read(): number | null; invalidate(): void }
-export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void, clock?: OverlayClock, onSync?: (waiting: boolean) => void): () => void {
+export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void, clock?: OverlayClock, onSync?: (waiting: boolean) => void, getStyle?: () => SubtitleStyle): () => void {
   const queries = tracks.map(createTimeline);
   const path = location.pathname;
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;text-align:center;';
   const shadow = host.attachShadow({ mode: 'closed' });
   const css = document.createElement('style');
-  css.textContent = `.line{white-space:pre-line;overflow-wrap:anywhere;color:white;font-family:Arial,"Microsoft YaHei",sans-serif;line-height:1.4;text-shadow:0 1px 3px black;margin:3px 0}.line span{background:rgba(0,0,0,.7);box-decoration-break:clone;padding:2px 7px}.line:empty{display:none}.lower{color:#dbe7ff}`;
+  css.textContent = `.line{white-space:pre-line;overflow-wrap:anywhere;color:white;font-family:Arial,"Microsoft YaHei",sans-serif;line-height:1.4;margin:3px 0}.line span{background:var(--subtitle-background,transparent);box-decoration-break:clone;padding:2px 7px}.line:empty{display:none}.lower{color:#dbe7ff}`;
   shadow.append(css);
   const lines = ['line', 'line lower'].map(className => {
     const line = document.createElement('div');
@@ -21,6 +22,7 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
   const nativeStyle = document.createElement('style');
   nativeStyle.textContent = '.player-timedtext { visibility: hidden !important; }';
   let stopped = false;
+  let lastStyle = '';
   let timer: ReturnType<typeof setInterval> | undefined;
   const events = ['seeked', 'seeking', 'timeupdate', 'pause', 'play', 'ratechange', 'loadedmetadata', 'emptied'];
   function mediaEvent(event: Event) {
@@ -39,6 +41,16 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
   function render() {
     if (stopped) return;
     try {
+      const style = normalizeStyle(getStyle?.() ?? { fontSize });
+      const key = JSON.stringify(style);
+      if (key !== lastStyle) {
+        lastStyle = key;
+        host.style.setProperty('--subtitle-background', `rgba(0,0,0,${style.backgroundOpacity / 100})`);
+        lines.forEach(line => {
+          line.style.fontSize = `${style.fontSize}px`;
+          line.style.textShadow = style.shadow ? TEXT_SHADOW : 'none';
+        });
+      }
       if (location.pathname !== path) {
         fail('影片或播放器已切换，已恢复原生字幕；请重新选择并开启。'); return;
       }

@@ -25,6 +25,10 @@
         <div class="preview"><p id="upper-preview">Your first subtitle language.</p><p id="lower-preview">这里显示你选择的第二种语言。</p></div>
         <label class="slider-label" for="font-size">字幕字号 <output id="font-size-value" for="font-size">24 px</output></label>
         <input id="font-size" type="range" min="16" max="36" step="1" value="24" disabled />
+        <label class="slider-label" for="background-opacity">字幕背景 <output id="background-value" for="background-opacity">透明</output></label>
+        <input id="background-opacity" type="range" min="0" max="100" step="5" value="0" disabled />
+        <label class="slider-label" for="text-shadow">文字阴影 <input id="text-shadow" type="checkbox" checked disabled /></label>
+        <button id="reset-style" type="button" disabled>恢复默认样式</button>
         <p id="settings-status" class="hint" role="status">正在读取本机设置…</p>
       </section>
       <button id="start-dual" class="primary" disabled>开启双语字幕（实验版）</button>

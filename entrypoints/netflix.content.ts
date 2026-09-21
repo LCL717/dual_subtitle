@@ -4,12 +4,24 @@ import { INSPECT_PLAYER, INSPECT_RESOURCES, START_DUAL, STOP_DUAL, DUAL_STATUS, 
 import { isSubtitlePayload, type DualState } from '../lib/dual';
 import { mountOverlay } from '../lib/overlay';
 import { connectPlaybackClock } from '../lib/clock-bridge';
+import { STYLE_KEY, LEGACY_SIZE_KEY, normalizeStyle } from '../lib/subtitle-style';
 import { isResourceReport, type ResourceReport } from '../lib/subtitle-resources';
 import { isTrackReport, type TrackReport } from '../lib/netflix-tracks';
 
 export default defineContentScript({
   matches: ['https://www.netflix.com/*'],
   main(ctx) {
+    let style = normalizeStyle(undefined);
+    let styleChanged = false;
+    const onStyleChange = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+      if (area !== 'local' || !(STYLE_KEY in changes)) return;
+      styleChanged = true;
+      style = normalizeStyle(changes[STYLE_KEY]?.newValue);
+    };
+    browser.storage.onChanged.addListener(onStyleChange);
+    void browser.storage.local.get([STYLE_KEY, LEGACY_SIZE_KEY]).then(saved => {
+      if (!styleChanged) style = normalizeStyle(saved[STYLE_KEY] ?? { fontSize: saved[LEGACY_SIZE_KEY] });
+    }).catch(() => {});
     let inspectedPath: string | undefined;
     let dual: DualState = { phase: 'off', detail: '双语字幕未开启。' };
     let generation = 0;
@@ -49,7 +61,7 @@ export default defineContentScript({
           clock.stop(); dual = { phase: 'error', detail };
         }, clock, waiting => {
           dual = { phase: 'active', detail: waiting ? '广告期间或正片时间未就绪，暂用原生字幕；时间恢复后自动同步。' : '双语字幕已开启。' };
-        });
+        }, () => style);
         removeOverlay = () => { unmount(); clock.stop(); };
       };
       const timer = setTimeout(() => {
@@ -140,6 +152,6 @@ export default defineContentScript({
       return true; // Keep the response channel open on Chromium.
     };
     browser.runtime.onMessage.addListener(listener);
-    ctx.onInvalidated(() => { stop(); browser.runtime.onMessage.removeListener(listener); });
+    ctx.onInvalidated(() => { stop(); browser.runtime.onMessage.removeListener(listener); browser.storage.onChanged.removeListener(onStyleChange); });
   },
 });

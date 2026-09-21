@@ -23,6 +23,8 @@ test('overlay follows seek, preserves text safety and restores native visibility
     video.currentTime = 2;
     stop = mountOverlay(video, tracks, 24, () => {});
     assert.equal(shadow.querySelector('script'), null);
+    assert.equal(shadow.host.style.getPropertyValue('--subtitle-background'), 'rgba(0,0,0,0)');
+    assert.notEqual(shadow.querySelector('.line').style.textShadow, 'none');
     assert.equal(shadow.querySelector('.line').textContent, '<script>not markup</script>');
     assert.equal(shadow.querySelector('.lower').textContent, 'English');
     assert.equal(window.getComputedStyle(native).visibility, 'hidden');
@@ -39,10 +41,18 @@ test('overlay follows seek, preserves text safety and restores native visibility
     // restores native captions; the next content sample resynchronizes unaided.
     let contentTime = 2;
     const clock = { read: () => contentTime, invalidate: () => { contentTime = null; } };
-    stop = mountOverlay(video, tracks, 24, () => {}, clock);
+    let style = { fontSize: 24, backgroundOpacity: 0, shadow: true };
+    stop = mountOverlay(video, tracks, 24, () => {}, clock, undefined, () => style);
     video.currentTime = 200;
     video.dispatchEvent(new window.Event('timeupdate'));
     assert.equal(shadow.querySelector('.lower').textContent, 'English');
+    const spanBeforeStyleChange = shadow.querySelector('.lower span');
+    style = { fontSize: 30, backgroundOpacity: 50, shadow: false };
+    video.dispatchEvent(new window.Event('timeupdate'));
+    assert.equal(shadow.querySelector('.lower span'), spanBeforeStyleChange);
+    assert.equal(shadow.querySelector('.lower').style.fontSize, '30px');
+    assert.equal(shadow.querySelector('.lower').style.textShadow, 'none');
+    assert.equal(shadow.host.style.getPropertyValue('--subtitle-background'), 'rgba(0,0,0,0.5)');
     contentTime = null;
     video.dispatchEvent(new window.Event('timeupdate'));
     assert.equal(shadow.querySelector('.lower').textContent, '');
