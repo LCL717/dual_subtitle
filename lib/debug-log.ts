@@ -14,6 +14,7 @@ export interface DebugEntry {
   playerDelta?: number | null;
   timelineJump?: boolean;
   diagnostics?: import('./ad-diagnostics.ts').AdDiagnostics;
+  internalTiming?: import('./internal-timing-probe.ts').InternalTiming;
   videoId: number | null;
   paused: boolean | null;
   seeking: boolean | null;
@@ -52,6 +53,6 @@ export function createDebugLog(limit = DEBUG_LIMIT, now = () => performance.now(
       else { entries[cursor] = row; cursor = (cursor + 1) % limit; dropped++; }
     },
     status() { return { active, count: entries.length, dropped, durationMs: startedAt ? Math.round((active ? now() : end) - start) : 0 }; },
-    export() { return { schemaVersion: 3, experiment: 'timeline-controls-v1', startedAt, ...this.status(), entries: [...entries.slice(cursor), ...entries.slice(0, cursor)] }; },
+    export() { return { schemaVersion: 4, experiment: 'internal-timing-v1', startedAt, ...this.status(), entries: [...entries.slice(cursor), ...entries.slice(0, cursor)] }; },
   };
 }

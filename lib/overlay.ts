@@ -6,9 +6,12 @@ import { hasVisibleAd } from './playback-clock.ts';
 import { createProgressClock, readProgress } from './progress-clock.ts';
 
 export interface OverlayClock { read(): number | null; invalidate(): void; adEpoch?(): number }
-export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void, clock?: OverlayClock, onSync?: (waiting: boolean, sync: SyncStatus) => void, getStyle?: () => SubtitleStyle): () => void {
+export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void, clock?: OverlayClock, onSync?: (waiting: boolean, sync: SyncStatus) => void, getStyle?: () => SubtitleStyle, useProgressClock = true): () => void {
   const queries = tracks.map(createTimeline);
   const sync = createSubtitleSync(tracks);
+  // New tracks can be loaded after an ad or native-language change. Do not
+  // assume the raw clock is already on the content timeline in native mode.
+  if (!useProgressClock) sync.resync();
   const progress = createProgressClock();
   let progressWasActive = false;
   let interacting = false;
@@ -100,7 +103,7 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
       const playing = !video.paused && !video.seeking && video.readyState >= 2;
       const blocked = interacting || now < controlBlockedUntil || video.seeking;
       if (blocked) progress.reset('seek-preview');
-      const progressTime = adEpoch > 0 && !blocked
+      const progressTime = useProgressClock && adEpoch > 0 && !blocked
         ? progress.read(readProgress(document, video), raw, now, playing, video.playbackRate, video.duration) : null;
       if (progressWasActive && progressTime === null && sync.status().mode !== 'recovering-seek') sync.resync();
       progressWasActive = progressTime !== null;

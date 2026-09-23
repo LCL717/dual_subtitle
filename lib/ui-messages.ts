@@ -6,6 +6,10 @@ export function resolveLanguage(saved: unknown, browserLanguage: string): UiLang
 // Chinese source messages remain compatible with existing content-script replies.
 // Placeholders preserve track names, counts and browser error details.
 export const messages: Record<string, string> = {
+  '第一字幕（跟随 Netflix）': 'First subtitles (follow Netflix)',
+  '请先在 Netflix 播放器中选择一种字幕语言。第一字幕跟随 Netflix。': 'Choose a subtitle language in the Netflix player first. First subtitles follow Netflix.',
+  '第一字幕跟随 Netflix，请选择不同语言的第二字幕。': 'First subtitles follow Netflix. Choose a different language for the second subtitles.',
+  '正在等待原生字幕匹配，取得可靠时间后自动恢复双语。': 'Waiting for matching Netflix subtitles. Dual subtitles resume once reliable timing is available.',
   '尚未取得可靠正片时间。请移动鼠标显示进度条数秒；也可拖动恢复双语，无需刷新。': 'Reliable content timing is unavailable. Move the pointer to show the progress bar for a few seconds, or seek to recover without refreshing.',
   '广告或校准期间暂停双语。广告结束后请显示进度条数秒；原生字幕匹配作为备用。': 'Dual subtitles are suspended during ads or calibration. After the ad, show the progress bar for a few seconds. Native subtitle matching is a fallback.',
   '自动校准失败，已保留原生字幕。请拖动进度条恢复双语，无需刷新页面。': 'Automatic resync failed. Native subtitles remain visible. Seek to restore dual subtitles without refreshing.',

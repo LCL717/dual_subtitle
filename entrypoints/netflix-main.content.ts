@@ -1,4 +1,5 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
+import { createInternalTimingProbe } from '../lib/internal-timing-probe';
 import { readAdCandidates, readPlayerHints, type PlayerHint } from '../lib/ad-diagnostics';
 import { inspectNetflixTracks } from '../lib/netflix-tracks';
 import { inspectPlayerResources } from '../lib/subtitle-resources';
@@ -9,6 +10,7 @@ export default defineContentScript({
   matches: ['https://www.netflix.com/*'],
   world: 'MAIN',
   main() {
+    const timingProbe = createInternalTimingProbe();
     const debugPlayerIds = new WeakMap<object, number>();
     let nextDebugPlayerId = 0;
     let resourceBusy = false;
@@ -22,8 +24,10 @@ export default defineContentScript({
         if (message.path !== location.pathname) return;
         if (message.debug === true) {
           let playerId: number | null = null;
+          let debugPlayer: object | undefined;
           let playerHints: PlayerHint[] = [];
           const raw = readPlaybackSample((window as unknown as Record<string, unknown>).netflix, location.pathname, false, player => {
+            debugPlayer = player;
             if (!debugPlayerIds.has(player)) debugPlayerIds.set(player, ++nextDebugPlayerId);
             playerId = debugPlayerIds.get(player)!;
             if (message.inspectAdUi === true) playerHints = readPlayerHints(player);
@@ -31,6 +35,8 @@ export default defineContentScript({
           const markers = visibleAdMarkers(document);
           window.postMessage({ type: 'dul:debug-clock-response:v1', id: message.id, path: location.pathname,
             seconds: raw.seconds, playerId, ad: markers.length > 0, markers,
+            ...(message.inspectAdUi === true && typeof message.timingSession === 'string' && message.timingSession.length <= 80
+              ? { internalTiming: timingProbe.sample(document, debugPlayer, `${location.pathname}:${message.timingSession}`) } : {}),
             ...(message.inspectAdUi === true ? { diagnostics: { ...readAdCandidates(document), playerHints } } : {}) }, location.origin);
           return;
         }

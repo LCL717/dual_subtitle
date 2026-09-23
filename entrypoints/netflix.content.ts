@@ -1,4 +1,6 @@
 import { browser } from 'wxt/browser';
+import { hasVisibleAd } from '../lib/playback-clock';
+import { nativeSelection } from '../lib/native-selection';
 import { DEBUG_LOG } from '../lib/debug-log';
 import { createDebugRecorder } from '../lib/debug-recorder';
 import type { SyncStatus } from '../lib/subtitle-sync';
@@ -65,10 +67,10 @@ export default defineContentScript({
         preferenceVersion++;
         restoreUntil = Date.now() + 90000; restoreAttempts = 0; retryAt = 0;
       }
-      if (!preferencesReady || !preferences?.enabled || restoreBusy || dual.phase === 'loading' || dual.phase === 'active'
-        || Date.now() < retryAt || restoreAttempts >= 3 || !/^\/watch\/\d+/.test(pagePath)) return;
-      if (Date.now() > restoreUntil) {
-        if (dual.phase === 'off') dual = { phase: 'error', detail: '自动恢复等待超时，请在播放器就绪后重新开启。' };
+      if (!preferencesReady || !preferences?.enabled || restoreBusy
+        || (dual.phase === 'error' && (Date.now() < retryAt || restoreAttempts >= 3)) || !/^\/watch\/\d+/.test(pagePath)) return;
+      if (Date.now() > restoreUntil && dual.phase === 'error') {
+        dual = { phase: 'error', detail: '自动恢复等待超时，请在播放器就绪后重新开启。' };
         return;
       }
       restoreBusy = true;
@@ -78,13 +80,21 @@ export default defineContentScript({
         const report = await inspectTracks();
         if (disposed || version !== preferenceVersion || path !== location.pathname || !preferences?.enabled) return;
         if (report.state !== 'ready' || !document.querySelector('video')) {
-          dual = { phase: 'off', detail: '正在等待播放器，字幕将自动恢复。' }; return;
+          if (!activeSelection) dual = { phase: 'off', detail: '正在等待播放器，字幕将自动恢复。' }; return;
         }
-        const ids = matchPreferences(report.tracks, preferences);
-        if (!ids[0] || !ids[1]) {
-          dual = { phase: 'error', detail: '当前影片缺少已保存的语言或字幕变体，或存在多个匹配项，请重新选择。' };
-          retryAt = Date.now() + 5000; return;
+        // Ad players may temporarily expose a different or empty subtitle selection.
+        if (hasVisibleAd(document)) return;
+        const selection = nativeSelection(report, matchPreferences(report.tracks, preferences)[1]);
+        const ids = selection.ids;
+        if (!ids) {
+          if (activeSelection) stop();
+          dual = { phase: 'off', detail: selection.detail };
+          restoreAttempts = 0; restoreUntil = Date.now() + 90000;
+          return;
         }
+        if (activeSelection?.[0] === ids[0] && activeSelection?.[1] === ids[1]
+          && ['active', 'loading'].includes(dual.phase)) return;
+        if (dual.phase !== 'error') { restoreAttempts = 0; restoreUntil = Date.now() + 90000; }
         inspectedPath = path;
         restoreAttempts++;
         retryAt = Date.now() + 8000;
@@ -131,14 +141,14 @@ export default defineContentScript({
           syncStatus = state;
           dual = { phase: 'active', detail: waiting
             ? state.mode === 'failed'
-              ? '尚未取得可靠正片时间。请移动鼠标显示进度条数秒；也可拖动恢复双语，无需刷新。'
+              ? '自动校准失败，已保留原生字幕。请拖动进度条恢复双语，无需刷新页面。'
               : state.mode === 'recovering-seek'
                 ? '正在验证拖动后的播放器时间…'
                 : state.mode === 'waiting-native'
-              ? '广告或校准期间暂停双语。广告结束后请显示进度条数秒；原生字幕匹配作为备用。'
+              ? '正在等待原生字幕匹配，取得可靠时间后自动恢复双语。'
               : '广告期间或正片时间未就绪，暂用原生字幕；时间恢复后自动同步。'
             : '双语字幕已开启。' };
-        }, () => style);
+        }, () => style, false);
         removeOverlay = () => { unmount(); clock.stop(); };
       };
       const timer = setTimeout(() => {
@@ -227,6 +237,9 @@ export default defineContentScript({
         const path = location.pathname;
         void inspectTracks().then(report => {
           if (disposed || version !== preferenceVersion || path !== location.pathname) { sendResponse(dual); return; }
+          const selection = nativeSelection(report, ids[1] ?? null);
+          if (!selection.ids) { sendResponse({ phase: 'off', detail: selection.detail }); return; }
+          ids[0] = selection.ids[0];
           const tracks = ids.map(id => report.tracks.find(track => track.id === id));
           if (report.state !== 'ready' || tracks.some(track => !track) || tracks[0]!.language === tracks[1]!.language) {
             sendResponse({ phase: 'error', detail: '字幕列表已变化，请重新检测并选择。' }); return;
@@ -256,7 +269,7 @@ export default defineContentScript({
         integration: 'pending' as const,
       };
       void inspectTracks().then(subtitles => sendResponse({ ...snapshot, subtitles, dual,
-        selection: activeSelection ?? (preferences ? matchPreferences(subtitles.tracks, preferences) : [null, null]),
+        selection: [subtitles.currentTrackId, activeSelection?.[1] ?? (preferences ? matchPreferences(subtitles.tracks, preferences)[1] : null)],
       }));
       return true; // Keep the response channel open on Chromium.
     };

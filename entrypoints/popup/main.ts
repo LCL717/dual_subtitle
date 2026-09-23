@@ -118,6 +118,8 @@ async function main() {
       for (const track of availableTracks) select.add(new Option(t(track.label), track.id));
       select.disabled = availableTracks.length === 0;
     }
+    upperLanguage.disabled = true;
+    upperLanguage.value = report?.currentTrackId ?? '';
     element('pending').textContent = t(availableTracks.length
       ? '选择两种不同语言后可尝试开启双语字幕。两条字幕准备成功后才隐藏原生字幕。'
       : '字幕列表尚不可用，请查看播放器状态。');
@@ -128,16 +130,42 @@ async function main() {
     resourceResult.textContent = t('');
     const upper = availableTracks.find(track => track.id === upperLanguage.value);
     const lower = availableTracks.find(track => track.id === lowerLanguage.value);
+    lowerLanguage.disabled = !upper;
     resourceButton.disabled = !(upper && lower && upper.language !== lower.language);
     updateStartButton();
     element('pending').textContent = t(upper && lower
       ? upper.language === lower.language
         ? '请选择两种不同语言；同语言的普通字幕和 SDH 不算两种语言。'
         : `已选上方：${upper.label}；下方：${lower.label}。点击开启以应用此组合。`
-      : '请分别选择上方和下方语言。选择不会更改 Netflix 当前字幕。');
+      : !upper ? '请先在 Netflix 播放器中选择一种字幕语言。第一字幕跟随 Netflix。' : '第一字幕跟随 Netflix，请选择不同语言的第二字幕。');
   }
   upperLanguage.addEventListener('change', checkSelection);
   lowerLanguage.addEventListener('change', checkSelection);
+  // Refresh native selection without discarding an unapplied second-language choice.
+  let nativePollBusy = false;
+  const nativeTimer = setInterval(async () => {
+    if (nativePollBusy || inspectedTabId === undefined || refresh.disabled) return;
+    nativePollBusy = true;
+    const version = statusVersion;
+    try {
+      const snapshot: unknown = await browser.tabs.sendMessage(inspectedTabId, { type: INSPECT_PLAYER }, { frameId: 0 });
+      if (version !== statusVersion || !isPlayerSnapshot(snapshot)) return;
+      const lower = lowerLanguage.value || snapshot.selection?.[1] || '';
+      const report = snapshot.subtitles;
+      if (report.state === 'ready') {
+        const changed = JSON.stringify(report.tracks) !== JSON.stringify(availableTracks)
+          || upperLanguage.value !== (report.currentTrackId ?? '') || lowerLanguage.value !== lower;
+        if (JSON.stringify(report.tracks) !== JSON.stringify(availableTracks)) showTracks(report);
+        upperLanguage.value = report.currentTrackId ?? '';
+        upperLanguage.disabled = true;
+        lowerLanguage.value = lower;
+        if (changed) checkSelection();
+      }
+      displayDual(snapshot.dual);
+    } catch { /* Manual recheck still reports connection errors. */ }
+    finally { nativePollBusy = false; }
+  }, 2000);
+  window.addEventListener('pagehide', () => clearInterval(nativeTimer));
   resourceButton.addEventListener('click', async () => {
     if (inspectedTabId === undefined) return;
     const generation = ++resourceGeneration;
@@ -197,7 +225,7 @@ async function main() {
       displayDual(snapshot.dual);
       if (snapshot.isWatchPage && snapshot.hasVideo) showTracks(report);
       if (Array.isArray(snapshot.selection) && snapshot.selection.length === 2) {
-        upperLanguage.value = snapshot.selection[0] ?? '';
+        upperLanguage.value = report.currentTrackId ?? '';
         lowerLanguage.value = snapshot.selection[1] ?? '';
         checkSelection();
       }
@@ -211,7 +239,7 @@ async function main() {
         : !snapshot.hasVideo
           ? '已进入播放页，等待播放器加载后请重新检测。'
           : report.state === 'ready'
-            ? '已连接 Netflix，可以选择两种字幕语言。'
+            ? '第一字幕跟随 Netflix，请选择不同语言的第二字幕。'
             : report.detail);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);

@@ -160,7 +160,8 @@ test('ad epoch hides the overlay until two native cue onsets establish the new m
     let mode;
     const cues = [{ start: 10, end: 10.2, text: 'First native caption' }, { start: 10.2, end: 10.4, text: 'Second native caption' }, { start: 10.4, end: 11, text: 'Third native caption' }];
     stop = mountOverlay(video, [cues, []], 24, () => assert.fail('unexpected stop'),
-      { read: () => raw, invalidate() {}, adEpoch: () => epoch }, (_, state) => { mode = state.mode; });
+      { read: () => raw, invalidate() {}, adEpoch: () => epoch }, (_, state) => { mode = state.mode; }, undefined, false);
+    assert.equal(shadow.host.hidden, true);
     const tick = () => video.dispatchEvent(new win.Event('timeupdate'));
     epoch = 1; raw = null; tick();
     assert.equal(shadow.host.hidden, true);
