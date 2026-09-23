@@ -69,14 +69,16 @@ async function main() {
   let statusTimer: ReturnType<typeof setTimeout> | undefined;
   let statusVersion = 0;
   let loading = false;
+  let active = false;
   function updateStartButton() {
     const a = availableTracks.find(track => track.id === upperLanguage.value);
     const b = availableTracks.find(track => track.id === lowerLanguage.value);
-    startButton.disabled = loading || !(a && b && a.language !== b.language);
+    startButton.disabled = loading || active || !(a && b && a.language !== b.language);
   }
   function displayDual(value: unknown) {
     if (!isDualState(value)) throw new Error('扩展状态不兼容，请重新加载并刷新 Netflix。');
     loading = value.phase === 'loading';
+    active = value.phase === 'active';
     dualStatus.textContent = t(value.detail);
     updateStartButton();
   }
