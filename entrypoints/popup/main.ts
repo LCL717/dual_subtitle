@@ -8,6 +8,7 @@ import { FONT_LIST_KEY, FALLBACK_FONTS, normalizeFontList, fontStack, fontLabel 
 import { STYLE_KEY, LEGACY_SIZE_KEY, DEFAULT_STYLE, normalizeStyle, TEXT_SHADOW, type SubtitleStyle } from '../../lib/subtitle-style';
 import { initializeLanguage, t } from '../../lib/ui-language';
 import { initializeDebugPanel } from './debug-panel';
+import { previewText } from '../../lib/preview-text';
 
 async function main() {
   await initializeLanguage(browser.storage.local);
@@ -122,12 +123,14 @@ async function main() {
     }
     upperLanguage.disabled = true;
     upperLanguage.value = report?.currentTrackId ?? '';
+    updatePreviewText();
     element('pending').textContent = t(availableTracks.length
       ? '选择两种不同语言后可尝试开启双语字幕。两条字幕准备成功后才隐藏原生字幕。'
       : '字幕列表尚不可用，请查看播放器状态。');
   }
 
   function checkSelection() {
+    updatePreviewText();
     resourceGeneration++;
     resourceResult.textContent = t('');
     const upper = availableTracks.find(track => track.id === upperLanguage.value);
@@ -253,7 +256,18 @@ async function main() {
     }
   }
 
+  function updatePreviewText() {
+    for (const [id, select] of [['upper-preview', upperLanguage], ['lower-preview', lowerLanguage]] as const) {
+      const track = availableTracks.find(candidate => candidate.id === select.value);
+      const preview = element(id);
+      preview.textContent = track ? previewText(track.language) ?? track.label : t('请选择字幕语言以预览');
+      preview.lang = track?.language ?? document.documentElement.lang;
+      preview.dir = 'auto';
+    }
+  }
+
   function updatePreview(style: SubtitleStyle) {
+    updatePreviewText();
     showFonts(style.fontFamily);
     size.value = String(style.fontSize);
     background.value = String(style.backgroundOpacity);

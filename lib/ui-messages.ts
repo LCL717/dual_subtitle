@@ -6,6 +6,7 @@ export function resolveLanguage(saved: unknown, browserLanguage: string): UiLang
 // Chinese source messages remain compatible with existing content-script replies.
 // Placeholders preserve track names, counts and browser error details.
 export const messages: Record<string, string> = {
+  '请选择字幕语言以预览': 'Choose a subtitle language to preview',
   '第一字幕（跟随 Netflix）': 'First subtitles (follow Netflix)',
   '请先在 Netflix 播放器中选择一种字幕语言。第一字幕跟随 Netflix。': 'Choose a subtitle language in the Netflix player first. First subtitles follow Netflix.',
   '第一字幕跟随 Netflix，请选择不同语言的第二字幕。': 'First subtitles follow Netflix. Choose a different language for the second subtitles.',
