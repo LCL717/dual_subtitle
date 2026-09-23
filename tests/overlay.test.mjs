@@ -84,3 +84,43 @@ test('overlay follows seek, preserves text safety and restores native visibility
     await window.happyDOM.close();
   }
 });
+
+test('ad epoch hides the overlay until two native cue onsets establish the new mapping', async () => {
+  const win = new Window({ url: 'https://www.netflix.com/watch/123' });
+  const previous = { document: globalThis.document, location: globalThis.location, innerHeight: globalThis.innerHeight };
+  Object.assign(globalThis, { document: win.document, location: win.location, innerHeight: 800 });
+  let stop;
+  try {
+    const video = win.document.createElement('video');
+    video.getBoundingClientRect = () => ({ left: 0, bottom: 700, width: 1000, height: 600 });
+    Object.defineProperty(video, 'paused', { value: false });
+    Object.defineProperty(video, 'readyState', { value: 4 });
+    const native = win.document.createElement('div');
+    native.className = 'player-timedtext'; native.textContent = 'First native caption';
+    win.document.body.append(video, native);
+    let shadow;
+    const attach = win.HTMLElement.prototype.attachShadow;
+    win.HTMLElement.prototype.attachShadow = function (options) { shadow = attach.call(this, options); return shadow; };
+    let raw = 10;
+    let epoch = 0;
+    let mode;
+    const cues = [{ start: 10, end: 10.2, text: 'First native caption' }, { start: 10.2, end: 10.4, text: 'Second native caption' }, { start: 10.4, end: 11, text: 'Third native caption' }];
+    stop = mountOverlay(video, [cues, []], 24, () => assert.fail('unexpected stop'),
+      { read: () => raw, invalidate() {}, adEpoch: () => epoch }, (_, state) => { mode = state.mode; });
+    const tick = () => video.dispatchEvent(new win.Event('timeupdate'));
+    epoch = 1; raw = null; tick();
+    assert.equal(shadow.host.hidden, true);
+    assert.notEqual(win.getComputedStyle(native).visibility, 'hidden');
+    raw = 30; tick();
+    assert.equal(mode, 'waiting-native');
+    raw = 30.2; native.textContent = 'Second native caption'; tick();
+    assert.equal(shadow.host.hidden, true);
+    raw = 30.4; native.textContent = 'Third native caption'; tick();
+    assert.equal(mode, 'aligned');
+    assert.equal(shadow.host.hidden, false);
+    assert.equal(shadow.querySelector('.line').textContent, 'Third native caption');
+    assert.equal(win.getComputedStyle(native).visibility, 'hidden');
+    stop();
+    assert.notEqual(win.getComputedStyle(native).visibility, 'hidden');
+  } finally { stop?.(); Object.assign(globalThis, previous); await win.happyDOM.close(); }
+});

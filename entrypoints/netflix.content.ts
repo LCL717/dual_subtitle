@@ -1,4 +1,7 @@
 import { browser } from 'wxt/browser';
+import { DEBUG_LOG } from '../lib/debug-log';
+import { createDebugRecorder } from '../lib/debug-recorder';
+import type { SyncStatus } from '../lib/subtitle-sync';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { INSPECT_PLAYER, INSPECT_RESOURCES, START_DUAL, STOP_DUAL, DUAL_STATUS, type PlayerSnapshot } from '../lib/protocol';
 import { isSubtitlePayload, type DualState } from '../lib/dual';
@@ -25,6 +28,10 @@ export default defineContentScript({
     }).catch(() => {});
     let inspectedPath: string | undefined;
     let dual: DualState = { phase: 'off', detail: '双语字幕未开启。' };
+    let syncWaiting = false;
+    let syncStatus: SyncStatus = { mode: 'raw', offset: null };
+    const debug = createDebugRecorder(() => ({ phase: dual.phase, waiting: dual.phase === 'active' && syncWaiting,
+      syncMode: syncStatus.mode, syncOffset: syncStatus.offset, syncDiagnostics: syncStatus.diagnostics }));
     let generation = 0;
     let removeOverlay: (() => void) | undefined;
     let cancelPending: (() => void) | undefined;
@@ -85,6 +92,7 @@ export default defineContentScript({
       } finally { restoreBusy = false; }
     }
     function stop() {
+      syncStatus = { mode: 'raw', offset: null }; syncWaiting = false;
       generation++;
       cancelPending?.(); cancelPending = undefined;
       removeOverlay?.(); removeOverlay = undefined;
@@ -118,8 +126,18 @@ export default defineContentScript({
         const clock = connectPlaybackClock();
         const unmount = mountOverlay(video, data.payload.tracks, fontSize, detail => {
           clock.stop(); dual = { phase: 'error', detail };
-        }, clock, waiting => {
-          dual = { phase: 'active', detail: waiting ? '广告期间或正片时间未就绪，暂用原生字幕；时间恢复后自动同步。' : '双语字幕已开启。' };
+        }, clock, (waiting, state) => {
+          syncWaiting = waiting;
+          syncStatus = state;
+          dual = { phase: 'active', detail: waiting
+            ? state.mode === 'failed'
+              ? '自动校准失败，已保留原生字幕。请拖动进度条恢复双语，无需刷新页面。'
+              : state.mode === 'recovering-seek'
+                ? '正在验证拖动后的播放器时间…'
+                : state.mode === 'waiting-native'
+              ? '广告或重新校准期间使用原生字幕。请在 Netflix 开启所选语言之一的同版本字幕，等待两个可匹配的字幕切换点。'
+              : '广告期间或正片时间未就绪，暂用原生字幕；时间恢复后自动同步。'
+            : '双语字幕已开启。' };
         }, () => style);
         removeOverlay = () => { unmount(); clock.stop(); };
       };
@@ -180,9 +198,16 @@ export default defineContentScript({
     }
     // Inspect on demand, so SPA navigation and video replacement need no polling.
     // TextTrack count is diagnostic only, not Netflix's complete language menu.
-    const listener = (message: unknown, sender: { id?: string }, sendResponse: (response: PlayerSnapshot | ResourceReport | DualState) => void) => {
+    const listener = (message: unknown, sender: { id?: string }, sendResponse: (response: unknown) => void) => {
       if (sender.id !== browser.runtime.id || !message || typeof message !== 'object'
         || !('type' in message)) return;
+      if (message.type === DEBUG_LOG && 'action' in message) {
+        if (message.action === 'start') sendResponse(debug.start());
+        else if (message.action === 'stop') sendResponse(debug.stop());
+        else if (message.action === 'status') sendResponse(debug.status());
+        else if (message.action === 'export') sendResponse({ ...debug.export(), extensionVersion: browser.runtime.getManifest().version });
+        return;
+      }
       if (message.type === STOP_DUAL) {
         const version = ++preferenceVersion;
         stop();
@@ -237,6 +262,6 @@ export default defineContentScript({
     };
     browser.runtime.onMessage.addListener(listener);
     const restoreTimer = setInterval(() => { void restore(); }, 1000);
-    ctx.onInvalidated(() => { disposed = true; clearInterval(restoreTimer); stop(); browser.runtime.onMessage.removeListener(listener); browser.storage.onChanged.removeListener(onStyleChange); });
+    ctx.onInvalidated(() => { disposed = true; debug.dispose(); clearInterval(restoreTimer); stop(); browser.runtime.onMessage.removeListener(listener); browser.storage.onChanged.removeListener(onStyleChange); });
   },
 });

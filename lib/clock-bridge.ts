@@ -24,6 +24,7 @@ export function connectPlaybackClock() {
   request();
   return {
     read: () => clock.read(performance.now()),
+    adEpoch: clock.adEpoch,
     invalidate() { clock.invalidate(); pending = undefined; request(); },
     stop() { disposed = true; clearInterval(timer); window.removeEventListener('message', receive); clock.invalidate(); },
   };

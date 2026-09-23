@@ -7,9 +7,11 @@ import type { SubtitleTrack, TrackReport } from '../../lib/netflix-tracks';
 import { FONT_LIST_KEY, FALLBACK_FONTS, normalizeFontList, fontStack, fontLabel } from '../../lib/fonts';
 import { STYLE_KEY, LEGACY_SIZE_KEY, DEFAULT_STYLE, normalizeStyle, TEXT_SHADOW, type SubtitleStyle } from '../../lib/subtitle-style';
 import { initializeLanguage, t } from '../../lib/ui-language';
+import { initializeDebugPanel } from './debug-panel';
 
 async function main() {
   await initializeLanguage(browser.storage.local);
+  initializeDebugPanel();
 
 
   function element<T extends HTMLElement>(id: string): T {

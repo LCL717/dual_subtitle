@@ -40,6 +40,13 @@
       <p id="dual-status" class="hint" role="status">双语字幕未开启。</p>
       <details class="troubleshooting">
         <summary>连接与字幕排查</summary>
+        <h3>同步诊断记录</h3>
+        <p class="hint">关闭弹窗后继续记录；刷新或关闭 Netflix 页面会丢失。最多保留 7200 条，重新开始会清空旧记录。</p>
+        <button id="debug-start" type="button">开始记录</button>
+        <button id="debug-stop" type="button" disabled>停止记录</button>
+        <button id="debug-download" type="button" disabled>下载记录</button>
+        <p id="debug-status" class="hint" role="status">正在读取记录状态…</p>
+        <p class="hint">仅记录时间、状态和事件，不含字幕正文、Cookie 或资源地址；不会上传。</p>
         <pre id="diagnostics" class="hint" aria-live="polite"></pre>
         <button id="inspect-resources" type="button" disabled>检查所选字幕资源</button>
         <pre id="resource-result" class="hint" role="status"></pre>

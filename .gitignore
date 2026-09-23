@@ -5,3 +5,5 @@ node_modules/
 .env.*
 *.local
 *.log
+debug/
+dul-subtitle-debug-*.json

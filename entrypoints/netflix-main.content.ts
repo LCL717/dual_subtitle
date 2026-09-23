@@ -1,13 +1,16 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
+import { readAdCandidates, readPlayerHints, type PlayerHint } from '../lib/ad-diagnostics';
 import { inspectNetflixTracks } from '../lib/netflix-tracks';
 import { inspectPlayerResources } from '../lib/subtitle-resources';
 import { loadSubtitles } from '../lib/load-subtitles';
-import { readPlaybackSample, hasVisibleAd } from '../lib/playback-clock';
+import { readPlaybackSample, hasVisibleAd, visibleAdMarkers } from '../lib/playback-clock';
 
 export default defineContentScript({
   matches: ['https://www.netflix.com/*'],
   world: 'MAIN',
   main() {
+    const debugPlayerIds = new WeakMap<object, number>();
+    let nextDebugPlayerId = 0;
     let resourceBusy = false;
     let loadController: AbortController | undefined;
     window.addEventListener('message', (event: MessageEvent) => {
@@ -17,6 +20,20 @@ export default defineContentScript({
         || typeof message.id !== 'string' || message.id.length > 80) return;
       if (message.type === 'dul:clock-request:v1') {
         if (message.path !== location.pathname) return;
+        if (message.debug === true) {
+          let playerId: number | null = null;
+          let playerHints: PlayerHint[] = [];
+          const raw = readPlaybackSample((window as unknown as Record<string, unknown>).netflix, location.pathname, false, player => {
+            if (!debugPlayerIds.has(player)) debugPlayerIds.set(player, ++nextDebugPlayerId);
+            playerId = debugPlayerIds.get(player)!;
+            if (message.inspectAdUi === true) playerHints = readPlayerHints(player);
+          });
+          const markers = visibleAdMarkers(document);
+          window.postMessage({ type: 'dul:debug-clock-response:v1', id: message.id, path: location.pathname,
+            seconds: raw.seconds, playerId, ad: markers.length > 0, markers,
+            ...(message.inspectAdUi === true ? { diagnostics: { ...readAdCandidates(document), playerHints } } : {}) }, location.origin);
+          return;
+        }
         const sample = readPlaybackSample((window as unknown as Record<string, unknown>).netflix,
           location.pathname, hasVisibleAd(document));
         window.postMessage({ type: 'dul:clock-response:v1', id: message.id, path: location.pathname, sample }, location.origin);

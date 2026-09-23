@@ -6,6 +6,16 @@ export function resolveLanguage(saved: unknown, browserLanguage: string): UiLang
 // Chinese source messages remain compatible with existing content-script replies.
 // Placeholders preserve track names, counts and browser error details.
 export const messages: Record<string, string> = {
+  '自动校准失败，已保留原生字幕。请拖动进度条恢复双语，无需刷新页面。': 'Automatic resync failed. Native subtitles remain visible. Seek to restore dual subtitles without refreshing.',
+  '正在验证拖动后的播放器时间…': 'Verifying the player clock after seeking…',
+  '广告或重新校准期间使用原生字幕。请在 Netflix 开启所选语言之一的同版本字幕，等待两个可匹配的字幕切换点。': 'Using native subtitles during ads or resync. Enable the matching Netflix subtitle language and variant for either selected track, then wait for two matching cue changes.',
+  '同步诊断记录': 'Sync debug log', '开始记录': 'Start recording', '停止记录': 'Stop recording', '下载记录': 'Download log',
+  '正在记录': 'Recording', '已停止记录': 'Stopped', '条记录': 'entries', '已覆盖旧记录': 'Overwritten',
+  '正在读取记录状态…': 'Reading log status…',
+  '关闭弹窗后继续记录；刷新或关闭 Netflix 页面会丢失。最多保留 7200 条，重新开始会清空旧记录。': 'Recording continues with the popup closed. Refreshing or closing Netflix loses the log. Keeps up to 7200 entries; restarting clears the previous log.',
+  '仅记录时间、状态和事件，不含字幕正文、Cookie 或资源地址；不会上传。': 'Records timing, state and events only. No subtitle text, cookies or resource URLs. Nothing is uploaded.',
+  '诊断记录尚未连接，请刷新 Netflix 播放页后重试。': 'Debug log is not connected. Refresh Netflix playback and retry.',
+  '诊断操作失败，请确认当前是 Netflix 播放页并刷新后重试。': 'Debug action failed. Check that Netflix playback is the active tab, refresh and retry.',
   '开发预览': 'Development preview',
   '让两种语言，同时出现。': 'Two languages, together.',
   '从当前影片的字幕中选择两种语言，按你的习惯排列。': 'Choose two subtitle languages for this title and arrange them your way.',

@@ -1,10 +1,14 @@
 import { createTimeline, type Cue } from './timeline.ts';
 import { normalizeStyle, TEXT_SHADOW, type SubtitleStyle } from './subtitle-style.ts';
 import { fontStack } from './fonts.ts';
+import { createSubtitleSync, nativeSubtitleSnapshot, type SyncStatus } from './subtitle-sync.ts';
+import { hasVisibleAd } from './playback-clock.ts';
 
-export interface OverlayClock { read(): number | null; invalidate(): void }
-export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void, clock?: OverlayClock, onSync?: (waiting: boolean) => void, getStyle?: () => SubtitleStyle): () => void {
+export interface OverlayClock { read(): number | null; invalidate(): void; adEpoch?(): number }
+export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void, clock?: OverlayClock, onSync?: (waiting: boolean, sync: SyncStatus) => void, getStyle?: () => SubtitleStyle): () => void {
   const queries = tracks.map(createTimeline);
+  const sync = createSubtitleSync(tracks);
+  let adEpoch = 0;
   const path = location.pathname;
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;text-align:center;';
@@ -27,7 +31,11 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
   let timer: ReturnType<typeof setInterval> | undefined;
   const events = ['seeked', 'seeking', 'timeupdate', 'pause', 'play', 'ratechange', 'loadedmetadata', 'emptied'];
   function mediaEvent(event: Event) {
-    if (['seeked', 'seeking', 'loadedmetadata', 'emptied'].includes(event.type)) clock?.invalidate();
+    if (event.type === 'seeking') {
+      sync.beginSeek(!!clock && clock.read() !== null && (clock.adEpoch?.() ?? 0) === adEpoch && !hasVisibleAd(document), video.currentTime);
+      clock?.invalidate();
+    } else if (event.type === 'seeked') { sync.endSeek(); clock?.invalidate(); }
+    else if (['loadedmetadata', 'emptied'].includes(event.type)) { clock?.invalidate(); sync.invalidate(); }
     render();
   }
   const stop = () => {
@@ -56,15 +64,6 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
       if (location.pathname !== path) {
         fail('影片或播放器已切换，已恢复原生字幕；请重新选择并开启。'); return;
       }
-      const time = clock ? clock.read() : video.currentTime;
-      if (time === null) {
-        onSync?.(true);
-        host.hidden = true;
-        lines.forEach(line => line.replaceChildren());
-        nativeStyle.remove();
-        return;
-      }
-      onSync?.(false);
       const currentVideo = document.querySelector('video');
       if (!currentVideo) { host.hidden = true; nativeStyle.remove(); return; }
       if (currentVideo !== video) {
@@ -72,8 +71,23 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
         for (const name of events) video.removeEventListener(name, mediaEvent);
         video = currentVideo;
         for (const name of events) video.addEventListener(name, mediaEvent);
-        clock.invalidate(); host.hidden = true; nativeStyle.remove(); return;
+        clock.invalidate(); sync.invalidate(); host.hidden = true; nativeStyle.remove(); return;
       }
+      const epoch = clock?.adEpoch?.() ?? 0;
+      if (epoch !== adEpoch) { adEpoch = epoch; sync.resync(); }
+      const raw = clock ? clock.read() : video.currentTime;
+      const mode = sync.status().mode;
+      const native = mode === 'raw' || mode === 'failed' ? { text: '', count: 0 } : nativeSubtitleSnapshot(document);
+      const time = sync.read(raw, native.text, performance.now(),
+        !video.paused && !video.seeking && video.readyState >= 2, video.playbackRate, native.count, video.currentTime);
+      if (time === null) {
+        onSync?.(true, sync.status());
+        host.hidden = true;
+        lines.forEach(line => line.replaceChildren());
+        nativeStyle.remove();
+        return;
+      }
+      onSync?.(false, sync.status());
       const parent = document.fullscreenElement ?? document.documentElement;
       if (parent === video) { fail('当前全屏模式无法叠加字幕，已恢复原生字幕。'); return; }
       if (host.parentNode !== parent) parent.append(host);
