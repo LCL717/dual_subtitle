@@ -42,8 +42,11 @@ export function createProgressClock() {
   let spread: number | null = null;
   let ui: number | null = null;
   let collectionSince: number | undefined;
+  function clearEvidence(why: string) {
+    offsets = []; lastUi = undefined; spread = null; collectionSince = undefined; reason = why;
+  }
   function reset(why = 'invalidated') {
-    offsets = []; offset = null; source = undefined; lastUi = undefined; previous = undefined; spread = null; reason = why; collectionSince = undefined;
+    clearEvidence(why); offset = null; source = undefined; previous = undefined;
   }
   return {
     reset,
@@ -54,40 +57,48 @@ export function createProgressClock() {
       if (previous && (now - previous.at > 1000 || duration !== previous.duration || raw < previous.raw - .25
         || raw - previous.raw > .75 + (now - previous.at) / 1000 * Math.max(rate, previous.rate))) reset('clock-discontinuity');
       previous = { raw, at: now, rate, duration };
+      const mapped = () => {
+        const time = offset === null ? null : raw + offset;
+        if (time !== null && (time < 0 || time > duration + .25)) { reset('mapped-out-of-range'); return null; }
+        return time;
+      };
       if (reading.seconds === null) {
-        reason = reading.reason;
-        if (!['progress-unavailable', 'progress-hidden', 'no-progress-candidates'].includes(reading.reason)) { reset(reading.reason); return null; }
-        // Hidden UI is not a new observation. Follow the fresh media clock only.
-        return offset === null ? null : Math.max(0, raw + offset);
+        // Unavailable/ambiguous UI cannot disprove an established media mapping.
+        // Clear only observations so reappearance starts independent verification.
+        clearEvidence(reading.reason);
+        return mapped();
       }
-      if (source && source !== reading.source) reset('progress-replaced');
+      if (source && source !== reading.source) clearEvidence('progress-replaced');
       source = reading.source;
-      if (!playing) { lastUi = undefined; offsets = []; collectionSince = undefined; reason = 'paused-or-buffering'; return offset === null ? null : Math.max(0, raw + offset); }
+      if (!playing) { clearEvidence('paused-or-buffering'); return mapped(); }
       if (lastUi?.value === reading.seconds) {
-        if (now - lastUi.at > 2500 && raw - lastUi.raw > .5) { reset('stale-progress'); return null; }
-        return offset === null ? null : Math.max(0, raw + offset);
+        if (now - lastUi.at > 2500 && raw - lastUi.raw > .5) {
+          offsets = []; spread = null; collectionSince = undefined; reason = 'stale-progress';
+        }
+        return mapped();
       }
       const candidate = reading.seconds - raw;
       if (!lastUi) {
         // First appearance may be an old or preview value: require an update.
-        lastUi = { value: reading.seconds, raw, at: now }; reason = 'waiting-progress-update'; return offset === null ? null : raw + offset;
+        lastUi = { value: reading.seconds, raw, at: now }; reason = offset === null ? 'waiting-progress-update' : 'revalidating-progress'; return mapped();
       }
       const consistent = now - lastUi.at <= 2500 && reading.seconds > lastUi.value && raw > lastUi.raw
         && Math.abs((reading.seconds - lastUi.value) - (raw - lastUi.raw)) <= .35;
       lastUi = { value: reading.seconds, raw, at: now };
-      if (!consistent) { offsets = []; offset = null; collectionSince = undefined; reason = 'inconsistent-progress'; return null; }
-      if (offset !== null && Math.abs(candidate - offset) > .35) { offset = null; offsets = []; collectionSince = undefined; }
+      if (!consistent) { offsets = []; spread = null; collectionSince = undefined; reason = 'inconsistent-progress'; return mapped(); }
       collectionSince ??= now;
       offsets.push(candidate); if (offsets.length > 5) offsets.shift();
       spread = Math.max(...offsets) - Math.min(...offsets);
-      if (spread > .3) offset = null;
       if (offsets.length === 5 && spread <= .3 && now - collectionSince >= 1000) {
-        offset = [...offsets].sort((a, b) => a - b)[2]!;
+        const verified = [...offsets].sort((a, b) => a - b)[2]!;
+        if (offset !== null && Math.abs(verified - offset) > .35) {
+          offset = null; clearEvidence('mapping-contradicted'); return null;
+        }
+        // Keep an already verified offset stable rather than chasing UI jitter.
+        offset ??= verified;
         reason = 'progress-aligned';
       } else reason = spread > .3 ? 'unstable-offset' : 'collecting-progress';
-      const time = offset === null ? null : raw + offset;
-      if (time !== null && (time < 0 || time > duration + .25)) { reset('mapped-out-of-range'); return null; }
-      return time;
+      return mapped();
     },
   };
 }

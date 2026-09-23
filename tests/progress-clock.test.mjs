@@ -67,12 +67,50 @@ test('unchanged, future seek target, delayed noisy UI and insufficient updates n
   }
 });
 
-test('stale UI, clock loss and replacement invalidate an established mapping', () => {
+test('stale UI preserves verified mapping but advertisement and clock loss invalidate it', () => {
   const clock = createProgressClock(), source = {};
   for (let i = 0; i <= 20; i++) clock.read({ seconds: 500 + i * .1, reason: 'valid', source }, 10 + i * .1, i * 100, true, 1, 2421);
   for (let i = 21; i <= 46; i++) clock.read({ seconds: 502, reason: 'valid', source }, 10 + i * .1, i * 100, true, 1, 2421);
-  assert.equal(clock.status().offset, null);
+  assert.equal(clock.status().offset, 490);
+  assert.equal(clock.status().reason, 'stale-progress');
   clock.reset('advertisement');
   assert.equal(clock.read({ seconds: 600, reason: 'valid', source }, null, 5000, true, 1, 2421), null);
   assert.equal(clock.status().reason, 'clock-unavailable');
+});
+
+test('verified offset survives long hidden intervals, rebuilt controls and initial stale readings', () => {
+  const clock = createProgressClock();
+  let source = {};
+  const read = (i, seconds, reason = 'valid') => clock.read({ seconds, reason, source }, 1000 + i * .25, i * 250, true, 1, 2421);
+  for (let i = 0; i <= 8; i++) read(i, 983 + i * .25);
+  assert.equal(clock.status().offset, -17);
+  for (let i = 9; i <= 128; i++) assert.equal(read(i, null, 'no-progress-candidates'), 983 + i * .25);
+  source = {};
+  assert.equal(read(129, 983 + 129 * .25 - .6), 983 + 129 * .25);
+  for (let i = 130; i <= 140; i++) {
+    assert.equal(read(i, 983 + i * .25 - (i % 2 ? .2 : 0)), 983 + i * .25);
+  }
+  assert.equal(clock.status().offset, -17);
+  source = {};
+  for (let i = 141; i <= 155; i++) assert.equal(read(i, 983 + i * .25), 983 + i * .25);
+  assert.equal(clock.status().offset, -17);
+});
+
+test('only a coherent sequence contradicts a mapping; media jumps still invalidate immediately', () => {
+  const clock = createProgressClock(), source = {};
+  const read = (i, ui) => clock.read({ seconds: ui, reason: 'valid', source }, 100 + i * .25, i * 250, true, 1, 2421);
+  for (let i = 0; i <= 8; i++) read(i, 83 + i * .25);
+  assert.equal(read(9, 800), 85.25); // isolated target/preview is not proof
+  assert.equal(read(10, 85.5), 85.5);
+  // New consistent mapping contradicts the old one by two seconds.
+  let rejected = false;
+  for (let i = 11; i <= 18; i++) {
+    const value = read(i, 81 + i * .25);
+    if (clock.status().reason === 'mapping-contradicted') { assert.equal(value, null); rejected = true; }
+  }
+  assert.equal(rejected, true);
+  for (let i = 19; i <= 30; i++) read(i, 81 + i * .25);
+  assert.equal(clock.status().offset, -19);
+  assert.equal(clock.read({ seconds: null, reason: 'progress-hidden' }, 500, 7750, true, 1, 2421), null);
+  assert.equal(clock.status().offset, null);
 });

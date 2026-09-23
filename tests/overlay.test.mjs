@@ -35,7 +35,20 @@ test('progress UI restores dual subtitles after ads with unrelated native langua
     slider.parentElement.hidden = true; raw = 32.1; now = 2100;
     video.dispatchEvent(new win.Event('timeupdate'));
     assert.equal(status.mode, 'aligned-progress');
-    epoch++; raw = null; now = 2200; video.dispatchEvent(new win.Event('timeupdate'));
+    // Recreated controls must not switch back to native subtitles while checked.
+    const replacement = slider.cloneNode();
+    replacement.getBoundingClientRect = slider.getBoundingClientRect;
+    slider.parentElement.hidden = false;
+    slider.replaceWith(replacement);
+    for (let i = 22; i <= 40; i++) {
+      now = i * 100; raw = 30 + i * .1;
+      replacement.setAttribute('aria-valuenow', String(1000000 + i * 100));
+      video.dispatchEvent(new win.Event('timeupdate'));
+      assert.equal(status.mode, 'aligned-progress');
+      assert.equal(shadow.host.hidden, false);
+      assert.equal(win.getComputedStyle(win.document.querySelector('.player-timedtext')).visibility, 'hidden');
+    }
+    epoch++; raw = null; now = 4100; video.dispatchEvent(new win.Event('timeupdate'));
     assert.equal(shadow.host.hidden, true);
     assert.equal(status.progress.offset, null);
   } finally {
