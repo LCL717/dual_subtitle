@@ -1,8 +1,9 @@
 import { createDebugLog } from './debug-log.ts';
 import { sanitizeAdDiagnostics } from './ad-diagnostics.ts';
 import { AD_SELECTORS } from './playback-clock.ts';
+import { readTimelineControls, timelineInteraction } from './timeline-probe.ts';
 
-export function createDebugRecorder(getState: () => { phase: string; waiting: boolean; syncMode?: string; syncOffset?: number | null; syncDiagnostics?: import('./subtitle-sync.ts').SyncStatus['diagnostics'] }) {
+export function createDebugRecorder(getState: () => { phase: string; waiting: boolean; syncMode?: string; syncOffset?: number | null; syncDiagnostics?: import('./subtitle-sync.ts').SyncStatus['diagnostics']; syncProgress?: import('./subtitle-sync.ts').SyncStatus['progress'] }) {
   const log = createDebugLog();
   const ids = new WeakMap<HTMLVideoElement, number>();
   let nextId = 0;
@@ -11,9 +12,11 @@ export function createDebugRecorder(getState: () => { phase: string; waiting: bo
   let pending: { id: string; at: number; path: string } | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
   const events = ['play', 'pause', 'seeking', 'seeked', 'waiting', 'playing', 'ratechange', 'loadedmetadata', 'durationchange', 'emptied', 'ended'];
+  const controlEvents = ['pointerdown', 'pointerup', 'keydown', 'input', 'change'];
   function snapshot(event: string, video = document.querySelector('video')) {
     if (video && !ids.has(video)) ids.set(video, ++nextId);
     return { event, videoTime: video && Number.isFinite(video.currentTime) ? video.currentTime : null,
+      timelineControls: readTimelineControls(document),
       videoDuration: video && Number.isFinite(video.duration) ? video.duration : null,
       videoCount: document.querySelectorAll('video').length, hidden: document.hidden,
       videoId: video ? ids.get(video)! : null, paused: video?.paused ?? null, seeking: video?.seeking ?? null,
@@ -21,6 +24,13 @@ export function createDebugRecorder(getState: () => { phase: string; waiting: bo
   }
   function media(event: Event) {
     if (event.target instanceof HTMLVideoElement) log.add(snapshot(event.type, event.target));
+  }
+  function controlEvent(event: Event) {
+    const interaction = timelineInteraction(event, document);
+    if (!interaction) return;
+    log.add({ ...snapshot(`control-${event.type}`), interaction });
+    // Observe after the page's event handlers too; never intercept playback.
+    queueMicrotask(() => { if (log.status().active) log.add({ ...snapshot(`control-${event.type}-after`), interaction }); });
   }
   function receive(event: MessageEvent) {
     if (event.source !== window || event.origin !== location.origin || !pending) return;
@@ -56,6 +66,7 @@ export function createDebugRecorder(getState: () => { phase: string; waiting: bo
     clearInterval(timer); timer = undefined; pending = undefined;
     window.removeEventListener('message', receive);
     for (const name of events) document.removeEventListener(name, media, true);
+    for (const name of controlEvents) document.removeEventListener(name, controlEvent, true);
   }
   return {
     start() {
@@ -64,6 +75,7 @@ export function createDebugRecorder(getState: () => { phase: string; waiting: bo
       log.start(); log.add(snapshot('recording-start'));
       window.addEventListener('message', receive);
       for (const name of events) document.addEventListener(name, media, true);
+      for (const name of controlEvents) document.addEventListener(name, controlEvent, true);
       timer = setInterval(sample, 250); sample();
       return log.status();
     },

@@ -3,11 +3,16 @@ import { normalizeStyle, TEXT_SHADOW, type SubtitleStyle } from './subtitle-styl
 import { fontStack } from './fonts.ts';
 import { createSubtitleSync, nativeSubtitleSnapshot, type SyncStatus } from './subtitle-sync.ts';
 import { hasVisibleAd } from './playback-clock.ts';
+import { createProgressClock, readProgress } from './progress-clock.ts';
 
 export interface OverlayClock { read(): number | null; invalidate(): void; adEpoch?(): number }
 export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize: number, onStop: (reason: string) => void, clock?: OverlayClock, onSync?: (waiting: boolean, sync: SyncStatus) => void, getStyle?: () => SubtitleStyle): () => void {
   const queries = tracks.map(createTimeline);
   const sync = createSubtitleSync(tracks);
+  const progress = createProgressClock();
+  let progressWasActive = false;
+  let interacting = false;
+  let controlBlockedUntil = 0;
   let adEpoch = 0;
   const path = location.pathname;
   const host = document.createElement('div');
@@ -29,13 +34,27 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
   let stopped = false;
   let lastStyle = '';
   let timer: ReturnType<typeof setInterval> | undefined;
-  const events = ['seeked', 'seeking', 'timeupdate', 'pause', 'play', 'ratechange', 'loadedmetadata', 'emptied'];
+  const events = ['seeked', 'seeking', 'timeupdate', 'pause', 'play', 'ratechange', 'loadedmetadata', 'durationchange', 'emptied'];
+  function controlEvent(event: Event) {
+    const target = event.target as Element | null;
+    const scrubber = target && typeof target.closest === 'function' && target.closest('.scrubber-container, .scrubber-bar');
+    if (event.type === 'pointerup' || event.type === 'pointercancel') {
+      if (interacting) { interacting = false; controlBlockedUntil = performance.now() + 1000; }
+      return;
+    }
+    if (!scrubber) return;
+    if (event.type === 'pointerdown') interacting = true;
+    progress.reset('control-interaction'); progressWasActive = false; controlBlockedUntil = performance.now() + 1000;
+  }
+  const controlEvents = ['pointerdown', 'pointerup', 'pointercancel', 'keydown'];
+  for (const name of controlEvents) document.addEventListener(name, controlEvent, true);
   function mediaEvent(event: Event) {
+    if (['seeking', 'seeked', 'loadedmetadata', 'durationchange', 'emptied', 'ratechange'].includes(event.type)) { progress.reset('media-event'); progressWasActive = false; }
     if (event.type === 'seeking') {
       sync.beginSeek(!!clock && clock.read() !== null && (clock.adEpoch?.() ?? 0) === adEpoch && !hasVisibleAd(document), video.currentTime);
       clock?.invalidate();
     } else if (event.type === 'seeked') { sync.endSeek(); clock?.invalidate(); }
-    else if (['loadedmetadata', 'emptied'].includes(event.type)) { clock?.invalidate(); sync.invalidate(); }
+    else if (['loadedmetadata', 'durationchange', 'emptied'].includes(event.type)) { clock?.invalidate(); sync.invalidate(); }
     render();
   }
   const stop = () => {
@@ -44,6 +63,7 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
     clearInterval(timer);
     host.remove(); nativeStyle.remove();
     for (const name of events) video.removeEventListener(name, mediaEvent);
+    for (const name of controlEvents) document.removeEventListener(name, controlEvent, true);
     document.removeEventListener('fullscreenchange', render);
   };
   const fail = (reason: string) => { stop(); onStop(reason); };
@@ -71,23 +91,33 @@ export function mountOverlay(video: HTMLVideoElement, tracks: Cue[][], fontSize:
         for (const name of events) video.removeEventListener(name, mediaEvent);
         video = currentVideo;
         for (const name of events) video.addEventListener(name, mediaEvent);
-        clock.invalidate(); sync.invalidate(); host.hidden = true; nativeStyle.remove(); return;
+        clock.invalidate(); sync.invalidate(); progress.reset('video-replaced'); progressWasActive = false; host.hidden = true; nativeStyle.remove(); return;
       }
       const epoch = clock?.adEpoch?.() ?? 0;
-      if (epoch !== adEpoch) { adEpoch = epoch; sync.resync(); }
+      if (epoch !== adEpoch) { adEpoch = epoch; sync.resync(); progress.reset('advertisement'); progressWasActive = false; }
       const raw = clock ? clock.read() : video.currentTime;
+      const now = performance.now();
+      const playing = !video.paused && !video.seeking && video.readyState >= 2;
+      const blocked = interacting || now < controlBlockedUntil || video.seeking;
+      if (blocked) progress.reset('seek-preview');
+      const progressTime = adEpoch > 0 && !blocked
+        ? progress.read(readProgress(document, video), raw, now, playing, video.playbackRate, video.duration) : null;
+      if (progressWasActive && progressTime === null && sync.status().mode !== 'recovering-seek') sync.resync();
+      progressWasActive = progressTime !== null;
       const mode = sync.status().mode;
       const native = mode === 'raw' || mode === 'failed' ? { text: '', count: 0 } : nativeSubtitleSnapshot(document);
-      const time = sync.read(raw, native.text, performance.now(),
-        !video.paused && !video.seeking && video.readyState >= 2, video.playbackRate, native.count, video.currentTime);
+      const nativeTime = sync.read(raw, native.text, now, playing, video.playbackRate, native.count, video.currentTime);
+      const time = blocked && adEpoch > 0 ? null : progressTime ?? nativeTime;
+      const status: SyncStatus = progressTime !== null ? { mode: 'aligned-progress', offset: progress.status().offset, progress: progress.status() }
+        : { ...sync.status(), progress: progress.status() };
       if (time === null) {
-        onSync?.(true, sync.status());
+        onSync?.(true, status);
         host.hidden = true;
         lines.forEach(line => line.replaceChildren());
         nativeStyle.remove();
         return;
       }
-      onSync?.(false, sync.status());
+      onSync?.(false, status);
       const parent = document.fullscreenElement ?? document.documentElement;
       if (parent === video) { fail('当前全屏模式无法叠加字幕，已恢复原生字幕。'); return; }
       if (host.parentNode !== parent) parent.append(host);

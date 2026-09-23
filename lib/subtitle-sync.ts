@@ -1,7 +1,7 @@
 import type { Cue } from './timeline.ts';
 
-export type SyncMode = 'raw' | 'waiting-native' | 'aligned' | 'failed' | 'recovering-seek';
-export interface SyncStatus { mode: SyncMode; offset: number | null; diagnostics?: {
+export type SyncMode = 'raw' | 'waiting-native' | 'aligned' | 'failed' | 'recovering-seek' | 'aligned-progress';
+export interface SyncStatus { mode: SyncMode; offset: number | null; progress?: ReturnType<ReturnType<typeof import('./progress-clock.ts').createProgressClock>['status']>; diagnostics?: {
   reason: string; containers: number; textLength: number; changes: number; matches: number; offsetDifference: number | null;
 } }
 const key = (text: string) => text.normalize('NFKC').replace(/[\s\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '');

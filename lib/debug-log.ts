@@ -2,6 +2,8 @@ export const DEBUG_LOG = 'dul-subtitle:debug-log:v1';
 export const DEBUG_LIMIT = 7200;
 export interface DebugEntry {
   elapsedMs: number;
+  timelineControls?: ReturnType<typeof import('./timeline-probe.ts').readTimelineControls>;
+  interaction?: NonNullable<ReturnType<typeof import('./timeline-probe.ts').timelineInteraction>>;
   event: string;
   videoTime: number | null;
   videoDuration?: number | null;
@@ -22,6 +24,7 @@ export interface DebugEntry {
   syncMode?: string;
   syncOffset?: number | null;
   syncDiagnostics?: import('./subtitle-sync.ts').SyncStatus['diagnostics'];
+  syncProgress?: import('./subtitle-sync.ts').SyncStatus['progress'];
   playerTime?: number | null;
   playerId?: number | null;
   ad?: boolean;
@@ -49,6 +52,6 @@ export function createDebugLog(limit = DEBUG_LIMIT, now = () => performance.now(
       else { entries[cursor] = row; cursor = (cursor + 1) % limit; dropped++; }
     },
     status() { return { active, count: entries.length, dropped, durationMs: startedAt ? Math.round((active ? now() : end) - start) : 0 }; },
-    export() { return { schemaVersion: 2, startedAt, ...this.status(), entries: [...entries.slice(cursor), ...entries.slice(0, cursor)] }; },
+    export() { return { schemaVersion: 3, experiment: 'timeline-controls-v1', startedAt, ...this.status(), entries: [...entries.slice(cursor), ...entries.slice(0, cursor)] }; },
   };
 }

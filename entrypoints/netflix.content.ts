@@ -31,7 +31,7 @@ export default defineContentScript({
     let syncWaiting = false;
     let syncStatus: SyncStatus = { mode: 'raw', offset: null };
     const debug = createDebugRecorder(() => ({ phase: dual.phase, waiting: dual.phase === 'active' && syncWaiting,
-      syncMode: syncStatus.mode, syncOffset: syncStatus.offset, syncDiagnostics: syncStatus.diagnostics }));
+      syncMode: syncStatus.mode, syncOffset: syncStatus.offset, syncDiagnostics: syncStatus.diagnostics, syncProgress: syncStatus.progress }));
     let generation = 0;
     let removeOverlay: (() => void) | undefined;
     let cancelPending: (() => void) | undefined;
@@ -131,11 +131,11 @@ export default defineContentScript({
           syncStatus = state;
           dual = { phase: 'active', detail: waiting
             ? state.mode === 'failed'
-              ? '自动校准失败，已保留原生字幕。请拖动进度条恢复双语，无需刷新页面。'
+              ? '尚未取得可靠正片时间。请移动鼠标显示进度条数秒；也可拖动恢复双语，无需刷新。'
               : state.mode === 'recovering-seek'
                 ? '正在验证拖动后的播放器时间…'
                 : state.mode === 'waiting-native'
-              ? '广告或重新校准期间使用原生字幕。请在 Netflix 开启所选语言之一的同版本字幕，等待两个可匹配的字幕切换点。'
+              ? '广告或校准期间暂停双语。广告结束后请显示进度条数秒；原生字幕匹配作为备用。'
               : '广告期间或正片时间未就绪，暂用原生字幕；时间恢复后自动同步。'
             : '双语字幕已开启。' };
         }, () => style);
