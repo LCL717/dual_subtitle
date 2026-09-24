@@ -2,9 +2,17 @@
 
 Watch Netflix with dual subtitles in Chrome or Edge on Windows. The first subtitle language follows Netflix's own subtitle selection; choose the second language in the extension. You need a Netflix account with access to the title you want to watch.
 
+**Currently supports Netflix only.** Other streaming websites and the Netflix mobile or desktop apps are not supported.
+
 ## Installation
 
-1. Choose the package for your browser: `dual-0.1.0-chrome.zip` or `dual-0.1.0-edge.zip`. Release files in this project are located in `.output/releases/v0.1.0/`.
+Download the v0.1.0 package for your browser:
+
+- [Download for Chrome](releases/v0.1.0/dual-0.1.0-chrome.zip?raw=true)
+- [Download for Edge](releases/v0.1.0/dual-0.1.0-edge.zip?raw=true)
+- [SHA-256 checksums](releases/v0.1.0/SHA256SUMS.txt)
+
+1. Download the ZIP using one of the links above. Access requires permission to this private GitHub repository.
 2. Extract the ZIP into a permanent folder. Keep this folder after installation.
 3. Open `chrome://extensions` or `edge://extensions` and enable **Developer mode**.
 4. Click **Load unpacked** and select the extracted folder containing `manifest.json`.
