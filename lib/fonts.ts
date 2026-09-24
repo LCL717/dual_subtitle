@@ -1,4 +1,4 @@
-export const FONT_LIST_KEY = 'dul-subtitle:local-font-families';
+export const FONT_LIST_KEY = 'dual-subtitle:local-font-families';
 export const FALLBACK_FONTS = [['', '系统默认'], ['@sans-serif', '无衬线（系统）'], ['@serif', '衬线（系统）'], ['@monospace', '等宽（系统）']] as const;
 // Display aliases only: CSS and saved preferences retain the enumerated family.
 const LOCAL_NAMES: Readonly<Record<string, string>> = {

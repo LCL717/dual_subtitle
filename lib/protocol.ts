@@ -1,10 +1,10 @@
 import { isTrackReport, type TrackReport } from './netflix-tracks';
 import { isDualState, type DualState } from './dual';
-export const INSPECT_PLAYER = 'dul-subtitle:inspect-player';
-export const INSPECT_RESOURCES = 'dul-subtitle:inspect-resources';
-export const START_DUAL = 'dul-subtitle:start';
-export const STOP_DUAL = 'dul-subtitle:stop';
-export const DUAL_STATUS = 'dul-subtitle:status';
+export const INSPECT_PLAYER = 'dual-subtitle:inspect-player';
+export const INSPECT_RESOURCES = 'dual-subtitle:inspect-resources';
+export const START_DUAL = 'dual-subtitle:start';
+export const STOP_DUAL = 'dual-subtitle:stop';
+export const DUAL_STATUS = 'dual-subtitle:status';
 
 export interface PlayerSnapshot {
   isWatchPage: boolean;

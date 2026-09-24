@@ -1,5 +1,5 @@
-export const STYLE_KEY = 'dul-subtitle:style';
-export const LEGACY_SIZE_KEY = 'dul-subtitle:font-size';
+export const STYLE_KEY = 'dual-subtitle:style';
+export const LEGACY_SIZE_KEY = 'dual-subtitle:font-size';
 import { validFontName } from './fonts.ts';
 export interface SubtitleStyle { fontSize: number; backgroundOpacity: number; shadow: boolean; fontFamily: string }
 export const DEFAULT_STYLE: SubtitleStyle = { fontSize: 24, backgroundOpacity: 0, shadow: true, fontFamily: '' };

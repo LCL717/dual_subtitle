@@ -1,9 +1,11 @@
 import { browser } from 'wxt/browser';
+import { migrateSettings } from '../../lib/migrate-settings';
 import { FONT_LIST_KEY, normalizeFontList, readLocalFonts, fontLabel, fontStack } from '../../lib/fonts';
 import './style.css';
 import { initializeLanguage, t } from '../../lib/ui-language';
 
 async function main() {
+  await migrateSettings(browser.storage.local).catch(() => {});
   await initializeLanguage(browser.storage.local);
 
   const scan = document.getElementById('scan') as HTMLButtonElement;

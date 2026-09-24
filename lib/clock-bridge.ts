@@ -10,12 +10,12 @@ export function connectPlaybackClock() {
     const now = performance.now();
     if (pending && now - pending.at < 700) return;
     pending = { id: crypto.randomUUID(), at: now };
-    window.postMessage({ type: 'dul:clock-request:v1', id: pending.id, path }, location.origin);
+    window.postMessage({ type: 'dual:clock-request:v1', id: pending.id, path }, location.origin);
   }
   function receive(event: MessageEvent) {
     if (disposed || location.pathname !== path || event.source !== window || event.origin !== location.origin) return;
     const data = event.data;
-    if (data?.type !== 'dul:clock-response:v1' || data.id !== pending?.id || data.path !== path || !isPlaybackSample(data.sample)) return;
+    if (data?.type !== 'dual:clock-response:v1' || data.id !== pending?.id || data.path !== path || !isPlaybackSample(data.sample)) return;
     clock.update(data.sample, performance.now());
     pending = undefined;
   }

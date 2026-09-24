@@ -1,4 +1,4 @@
-export const DEBUG_LOG = 'dul-subtitle:debug-log:v1';
+export const DEBUG_LOG = 'dual-subtitle:debug-log:v1';
 export const DEBUG_LIMIT = 7200;
 export interface DebugEntry {
   elapsedMs: number;

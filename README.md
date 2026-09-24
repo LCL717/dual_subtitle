@@ -1,140 +1,66 @@
-# Dul Subtitle
+# Dual Subtitle
 
-用户已确认控制条反复显示导致的字幕闪烁已解决：保留已验证偏移，将控件重建、隐藏及旧 UI 读数与映射失效分开处理；只有连续一致的新证据与旧映射冲突时才撤销映射。广告、seek、播放器时间跳变及过期仍使映射失效。65 项测试、类型检查和 Chrome / Edge 构建通过。广告后首次校准可能仍需显示进度条。
+Watch Netflix with dual subtitles in Chrome or Edge on Windows. The first subtitle language follows Netflix's own subtitle selection; choose the second language in the extension. You need a Netflix account with access to the title you want to watch.
 
-进度条同步修复已接入，用户确认显示进度条后能恢复字幕。扩展使用进度条正片位置校准，原生字幕匹配与手动拖动恢复作为备用；日志中的 `aligned-progress` 表示使用进度条映射。63 项自动测试、类型检查和两款浏览器构建通过。详见 [修复版测试流程](docs/timeline-experiment.md)。
+## Installation
 
-**已知问题：广告后首次校准可能需要显示进度条。** 用户反馈不移动鼠标显示控制条时无法自动恢复。临时办法是在广告结束后移动鼠标，保持进度条显示数秒，直到双语恢复。校准成功后设计上可隐藏控制条继续播放，该场景仍待专项确认。尚未确定隐藏时 DOM 是否被移除或读数是否停止更新；当前读取逻辑会排除不可见控件。后续先验证隐藏读数的新鲜度，再决定是否使用隐藏控件或追踪内部时间源。
+1. Choose the package for your browser: `dual-0.1.0-chrome.zip` or `dual-0.1.0-edge.zip`. Release files in this project are located in `.output/releases/v0.1.0/`.
+2. Extract the ZIP into a permanent folder. Keep this folder after installation.
+3. Open `chrome://extensions` or `edge://extensions` and enable **Developer mode**.
+4. Click **Load unpacked** and select the extracted folder containing `manifest.json`.
+5. Open or refresh your Netflix playback page. Pin Dual Subtitle to the browser toolbar for easy access.
 
-诊断日志 schemaVersion 为 3，保留进度条候选值与操作前后快照，并增加映射校准状态。
+If you already have a project build, you can load `.output/chrome-mv3` in Chrome or `.output/edge-mv3` in Edge directly.
 
-校准恢复更新：自动校准等待超过 30 秒会明确提示失败并保留原生字幕。广告后手动拖动可触发独立时间验证与恢复，不再强制等待原生文本匹配；效果待实测。诊断日志新增具体匹配失败原因。
+## Enable and change subtitles
 
-广告同步修复待实测：已识别用户日志中的广告 UI，广告后通过两个匹配的原生字幕切换点重建时间映射。请在 Netflix 开启与双语组合中一条相同的语言及 SDH 变体；校准期间保留原生字幕。原生字幕关闭或无法匹配时，不会猜测恢复。步骤见 [修复版验收](docs/debug-ad-test.md)。
+1. Choose a subtitle language in the Netflix player, such as Japanese.
+2. Click the Dual Subtitle toolbar icon. The first subtitle language follows Netflix and cannot be changed independently in the extension.
+3. Choose a different language for the second subtitles, such as English.
+4. Click **Enable dual subtitles (experimental)**. Both lines appear after the subtitles finish loading and synchronization is established.
 
-广告错位排查：弹窗“连接与字幕排查”中提供开始、停止和下载诊断记录。请按 [广告诊断测试流程](docs/debug-ad-test.md) 捕获广告前后与手动拖动校正过程；刷新页面前先下载日志。
+The first subtitles follow changes made in Netflix, including standard and SDH variants. Turning Netflix subtitles off suspends dual subtitles and prompts you to select a language. Turning them back on allows dual subtitles to resume automatically.
 
-界面支持简体中文 / English：在弹窗或字体设置页顶部切换。首次根据浏览器语言选择（中文浏览器使用中文，其余使用英文），手动选择后保存在本机，两页下次打开时使用同一设置。切换会刷新当前扩展界面，不会关闭双语字幕；建议先应用正在编辑的字幕组合。字幕内容、Netflix 语言名称及本机字体原名不随界面语言改变。
+The Start button is disabled while dual subtitles are loading or active. To change the second language, first click **Disable and restore Netflix subtitles**, choose the new language, then enable dual subtitles again. The two languages must be different.
 
-首版 v0.1.0 已提供 Chrome / Edge 本地安装包；安装、升级与已知限制见 [发行说明](docs/releases/v0.1.0.md)。使用 `npm.cmd run zip` 和 `npm.cmd run zip:edge` 分别生成 `.output/` 下的浏览器压缩包。
+Available languages come from the current title. The extension does not provide machine translation or external subtitle imports.
 
-Chrome / Edge 的 Netflix 双语字幕扩展，使用 WXT + TypeScript + 原生 HTML/CSS。
+## Style and fonts
 
-## 当前进度
+Adjust font size, background opacity, text shadow, and font in the popup. Both subtitle lines share the same style. The default background is transparent, with text shadow enabled. Changes are saved automatically and immediately applied to the preview and active subtitles. Use the reset button to restore the default style.
 
-已实现实验性的字幕加载与上下双语叠加。用户已在当前 Netflix 影片上确认 Japanese [SDH] 与 English [SDH] 双语显示成功。其他影片、语言组合及浏览器场景仍需扩展验收。
+The preview shows sample sentences in your selected languages, rather than dialogue from the current title. If a sample is unavailable, it displays the language name instead.
 
-1. 在扩展管理页重新加载扩展，再刷新 Netflix。
-2. 打开扩展，重新检测，选择上下两种不同语言。
-3. 点击“开启双语字幕（实验版）”，等待结果；成功时显示“双语字幕已开启”。
-4. 回到视频检查同步、暂停、拖动和全屏。
-5. 点击“关闭并恢复原生字幕”退出。下载或解析失败时保留原生字幕，错误显示在按钮下方。
+To use fonts installed on your computer:
 
-当前支持常见 IMSC/TTML 文本段落、时钟/帧/tick 时间、换行与父级时间偏移。暂不支持图像字幕、段内独立计时、顺序时间容器、复杂排版或 WebVTT。无字幕导入、无机器翻译。
+1. Open the font settings page using the local font button in the popup.
+2. Start or refresh the font scan and grant permission when prompted by your browser.
+3. Return to Netflix, reopen the extension, and select a font from the dropdown.
 
-字幕请求在 Netflix 页面内发起，不增加跨域扩展权限；如果遇到 CORS、请求失败或格式错误，请提供扩展里的错误提示。不要发送带凭据的字幕地址。
+Common Chinese and Japanese fonts display their native names. Your operating system may ignore font styling inside dropdown menus, so use the style preview to check the result. Unsupported characters use fallback fonts. Default fonts remain available if scanning fails or permission is denied. Scan again after installing or removing fonts to update the list.
 
-开启时自动保存上下字幕语言、SDH/变体及启用状态。刷新或进入下一集后会等待播放器并匹配新轨道自动加载；缺少语言或匹配不唯一时提示选择。手动关闭后保持关闭。样式实时保存并生效。此版本仍需真实刷新和切集验收，不宣称最终计划已全部完成。
+## Interface language
 
-## 先看界面（不需要敲命令）
+Choose Simplified Chinese or English at the top of the popup or font settings page. Your choice is saved automatically. On first use, the interface language follows your browser language.
 
-本次已生成构建目录，可直接加载：
+Switching languages reloads only the extension interface and does not disable active subtitles. Apply any pending subtitle selection before switching.
 
-1. Chrome 打开 `chrome://extensions`；Edge 打开 `edge://extensions`。
-2. 开启“开发者模式”，点击“加载已解压的扩展程序”。
-3. Chrome 选择项目下 `.output/chrome-mv3`，Edge 选择 `.output/edge-mv3`。请选择包含 manifest.json 的目录，不要选择项目根目录。
-4. 从浏览器扩展列表打开 Dul Subtitle，可将图标固定到工具栏。
-5. 打开或刷新 Netflix，再点击扩展中的“重新检测”。已打开的页面需要刷新才能加载新安装的内容脚本。
-6. 调整预览字号，关闭再打开弹窗，检查字号是否保留。
+## Ads, page refreshes, and the next episode
 
-读取字幕列表后也不代表双语显示已可用。更新扩展后需要在扩展管理页重新加载，再刷新 Netflix。预览中的文字是固定示例，与当前影片无关。
+Dual subtitles pause during ads. After an ad, Netflix's own subtitles remain visible until enough matching dialogue is available to synchronize and resume dual subtitles. You do not need to move the mouse or show the playback controls. Scenes without dialogue may require a longer wait.
 
-## 在 VS Code 开发
+The extension remembers the second language and whether dual subtitles are enabled when you refresh the page or move to the next episode. The first language continues to follow Netflix. If the second language is missing, its subtitle variant cannot be matched, or both languages are the same, open the extension and choose another language. Manually disabling dual subtitles keeps them disabled after a refresh.
 
-已安装 Node.js LTS。若 VS Code 终端找不到 node / npm，请完全退出并重新打开 VS Code，以更新 PATH。
+## Updating
 
-Windows PowerShell 建议使用 npm.cmd，避免 npm.ps1 的执行策略问题：
+Replace the files in your existing installation folder with the contents of the new ZIP. Click **Reload** on the extension management page, then refresh Netflix. Keep the same installation folder and avoid uninstalling the old extension first to help preserve your local settings.
 
-```powershell
-npm.cmd ci
-npm.cmd run dev
-```
+## Troubleshooting
 
-`npm.cmd ci` 按 package-lock.json 安装依赖；初次安装已完成，不必现在重复执行。WXT 开发模式会启动开发浏览器。若自动启动受浏览器限制，可构建后按上面的步骤手动加载。
+- **Not connected or no languages listed:** Open a Netflix playback page, refresh it, and use the extension's recheck button. Refresh Netflix after installing or updating the extension as well.
+- **First language is empty or language controls are disabled:** Enable a subtitle language in the Netflix player first.
+- **Only Netflix subtitles appear after an ad:** Wait for dialogue so synchronization can finish. If the extension reports synchronization failure, manually seek using the progress bar to recover.
+- **Subtitles fail to load:** Check the message in the popup. Some subtitle formats and image subtitles are unsupported; try another track.
+- **You need to share a diagnostic recording:** Expand the connection and subtitle diagnostics section, start recording, reproduce the issue, then stop and download the recording. Download it before refreshing the page to avoid losing it.
 
-```powershell
-npm.cmd run dev:edge
-npm.cmd run typecheck
-npm.cmd run build
-npm.cmd run build:edge
-npm.cmd run zip
-```
-
-- `dev` / `dev:edge`：启动开发流程，按 Ctrl+C 停止。
-- `typecheck`：检查 TypeScript 类型。
-- `build` / `build:edge`：生成对应浏览器的生产构建。
-- `zip`：生成 Chrome 扩展压缩包，不会上传或发布。
-
-修改代码并重新构建后，在扩展管理页点击刷新；如修改了内容脚本，还需刷新 Netflix 页面。
-
-## 文件说明
-
-- `wxt.config.ts`：WXT 和扩展配置；manifest.json 由 WXT 生成。
-- `entrypoints/popup/`：工具栏弹窗界面与设置。
-- `entrypoints/netflix.content.ts`：Netflix 页面检测、字幕加载协调与叠加层生命周期。
-- `lib/protocol.ts`：弹窗与页面间的消息约定。
-- `PLAN.md`：最终需求与分阶段计划。
-- `docs/feasibility.md`：双轨字幕可行性状态。
-- `docs/manual-test.md`：构建记录与手动测试清单。
-- `.output/`：构建结果，`.wxt/`：自动生成的开发文件，均不应手工修改或提交。
-
-## 权限
-
-目前仅申请 storage，用于保存预览字号；内容脚本仅匹配 `https://www.netflix.com/*`。当前不读取 Cookie，不上传数据，不切换 Netflix 原生字幕轨道，也不请求所有网站权限。双轨就绪后通过临时样式隐藏原生字幕，关闭时移除样式恢复。
-
-## 开发资料
-
-- [WXT 安装与从零创建项目](https://wxt.dev/guide/installation)
-- [WXT 入口文件约定](https://wxt.dev/guide/essentials/entrypoints)
-- [Chrome 本地加载扩展](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world)
-
-## 问题排查
-
-通常只需选择两种语言并开启。遇到问题时，展开弹窗底部的“连接与字幕排查”，查看连接详情或检查所选字幕资源。诊断检查仅检查资源信息，不启动字幕播放。
-
-## 后续优先级
-
-1. 保存语言偏好，并在重新打开弹窗时恢复当前选择与播放状态。
-2. 切集后重新匹配语言并自动加载；缺少语言时提示选择。
-3. 字号即时生效，增加上下独立字号、底部位置与背景设置。
-4. 扩充多影片、多语言、全屏、跳片头、暂停、拖动、倍速及 Chrome / Edge 验收。
-5. 根据实际影片增加字幕格式支持，改善资源查找性能与失败重试。
-
-发布扩展商店、图标与安装包完善放在功能稳定之后。
-## 广告期间的同步
-
-新版本改用 Netflix 播放器时间同步字幕。检测到广告或暂时无法取得新时间时，显示会退回原生字幕；新时间恢复后自动继续双语，不主动拖动视频。修复已通过模拟测试，真实广告场景待验证。更新后需重新加载扩展并刷新 Netflix。
-
-## 样式设置
-
-默认透明背景、开启文字阴影。在弹窗中调整字号、背景透明度或阴影开关，预览和已开启的双语字幕实时更新；无需重新开启。设置自动保存在本机，也可以恢复默认样式。已有字号偏好会保留，新增背景和阴影采用默认值。
-
-## 刷新与下一集自动恢复
-
-升级后先重新加载扩展、刷新 Netflix，并选择一次两种语言点击开启，以建立偏好。以后刷新或切到下一集可自动恢复，不需要打开弹窗。重新打开弹窗会恢复当前选择；字幕变体无法唯一匹配时要求重新选择，不自动换语言。
-
-等待播放器最长 90 秒，每次页面切换最多进行三次字幕加载尝试；暂用原生字幕，失败会保留原因。手动关闭会保存为关闭状态。当前语言偏好是本机默认值：已打开的其他标签页不立即改动自己的选择，新打开或刷新的页面使用最近保存的偏好。
-## 本机字体选择
-
-常见中日文字体显示本地名称并附原名（例如“微软雅黑（Microsoft YaHei）”“游ゴシック（Yu Gothic）”），未识别名称保持原样。下拉选项和字体读取页按各自字体显示；系统原生下拉菜单可能忽略选项字体，请以样式预览为准。不支持的字符仍由备用字体显示。
-
-在扩展弹窗的“字体”下拉框选择上下字幕共用的字体，实时预览、自动保存，并应用到已开启字幕。首次只提供系统默认、无衬线、衬线与等宽备用选项，不预设某种具体字体已安装。
-
-点击“读取本机字体…”打开独立设置页，再点击“读取 / 更新本机字体”，按浏览器提示授权。成功后回到 Netflix 并重新打开扩展，下拉框会包含浏览器返回的字体家族，已自动去重。仅在本机保存名称，不上传或读取字体文件内容。
-
-浏览器可能不支持此 API，或限制扩展页面权限；拒绝/失败时保留已有列表和备用选项。列表是上次读取的结果，安装或卸载字体后需手动更新。缺失字体或字符会使用备用字体。恢复默认样式会恢复系统默认字体；清除字体列表不会撤销浏览器权限。
-# 当前字幕选择方式
-
-第一字幕跟随 Netflix 播放器当前选择的字幕，不能在扩展中独立修改；第二字幕选择另一种语言。未开启 Netflix 字幕时，扩展暂停双语并提示先选择原生字幕。已开启的双语会监测原生语言变化；刷新或换集时保留第二语言偏好，缺少该轨道或语言相同则提示重新选择。
-
-启动或重新加载字幕、广告结束后，先保留原生字幕，等待匹配字幕切换点校准，再恢复双语；无需主动显示控制条。无对白或匹配失败时可能继续显示原生字幕，失败后可手动拖动恢复。用户已确认本轮五项实机测试通过：双语显示、原生字幕关闭/恢复、原生语言切换、广告后控制条隐藏时自动恢复、刷新或换集保留第二语言。
+Language and style settings are stored locally. Diagnostic recording must be started manually; you decide whether to download and share the resulting file.

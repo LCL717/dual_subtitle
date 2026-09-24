@@ -1,5 +1,5 @@
 export type UiLanguage = 'zh-CN' | 'en';
-export const UI_LANGUAGE_KEY = 'dul-subtitle:ui-language';
+export const UI_LANGUAGE_KEY = 'dual-subtitle:ui-language';
 export function resolveLanguage(saved: unknown, browserLanguage: string): UiLanguage {
   return saved === 'en' || saved === 'zh-CN' ? saved : browserLanguage.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
 }
@@ -62,7 +62,7 @@ export const messages: Record<string, string> = {
   '资源信息可用于排查，能否播放以开启后的结果为准。': 'Metadata is for diagnostics. Enable subtitles to verify playback.',
   '资源检查失败：{0}': 'Resource inspection failed: {0}',
   '正在检测当前页面…': 'Checking the current page…',
-  '当前打开的是普通网页预览，无法连接 Netflix。请加载扩展后，在 Netflix 标签页点击浏览器工具栏里的 Dul Subtitle 图标。': 'This is a web preview and cannot connect to Netflix. Load the extension and open Dul Subtitle from the toolbar on a Netflix tab.',
+  '当前打开的是普通网页预览，无法连接 Netflix。请加载扩展后，在 Netflix 标签页点击浏览器工具栏里的 Dual Subtitle 图标。': 'This is a web preview and cannot connect to Netflix. Load the extension and open Dual Subtitle from the toolbar on a Netflix tab.',
   '没有找到当前标签页。': 'No active tab found.',
   '当前标签页是扩展自身。请切换到 Netflix 播放页，再从浏览器工具栏打开扩展。': 'This tab belongs to the extension. Switch to Netflix playback and open the extension from the toolbar.',
   '播放器检测超时（5 秒），页面脚本没有响应。': 'Player check timed out after 5 seconds. The page script did not respond.',
@@ -77,7 +77,7 @@ export const messages: Record<string, string> = {
   '设置读取失败，暂时使用默认字号。': 'Unable to load settings. Using the default font size for now.',
   '样式已保存，已开启的字幕会实时更新。': 'Style saved. Active subtitles update immediately.',
   '保存失败，请重新调整样式重试。': 'Save failed. Adjust the style again to retry.',
-  'Dul Subtitle · 本机字体': 'Dul Subtitle · Local fonts', '读取本机字体': 'Read local fonts',
+  'Dual Subtitle · 本机字体': 'Dual Subtitle · Local fonts', '读取本机字体': 'Read local fonts',
   '点击后，浏览器可能请求字体访问权限。仅将字体名称保存在本机，不上传或读取字体文件内容。': 'Your browser may request font access. Only font names are stored locally; font files are not read or uploaded.',
   '读取 / 更新本机字体': 'Read / update local fonts', '清除已保存的字体列表': 'Clear saved font list',
   '未读取时仍可使用系统默认、衬线和等宽字体。': 'System default, serif and monospace fonts are available without scanning.',

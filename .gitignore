@@ -6,4 +6,5 @@ node_modules/
 *.local
 *.log
 debug/
+dual-subtitle-debug-*.json
 dul-subtitle-debug-*.json

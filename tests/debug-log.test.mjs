@@ -36,7 +36,7 @@ test('recorder correlates responses, captures seek events, redacts extras and st
     win.document.body.innerHTML = '<video></video>';
     recorder.start();
     const request = sent[0];
-    const response = { type: 'dul:debug-clock-response:v1', id: request.id, path: request.path,
+    const response = { type: 'dual:debug-clock-response:v1', id: request.id, path: request.path,
       seconds: 120, playerId: 1, ad: false, markers: ['secret', '[data-uia="ads-info"]'], secret: 'cookie' };
     win.dispatchEvent(new win.MessageEvent('message', { origin: win.location.origin, source: win, data: { ...response, id: 'wrong' } }));
     assert.equal(recorder.status().count, 1);

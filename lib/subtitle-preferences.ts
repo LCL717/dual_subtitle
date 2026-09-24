@@ -1,5 +1,5 @@
 import type { SubtitleTrack } from './netflix-tracks';
-export const PREFERENCES_KEY = 'dul-subtitle:preferences';
+export const PREFERENCES_KEY = 'dual-subtitle:preferences';
 export interface TrackPreference { language: string; sdh: boolean; variant: string }
 export interface Preferences { enabled: boolean; upper: TrackPreference; lower: TrackPreference }
 export function preferenceFor(track: SubtitleTrack): TrackPreference {

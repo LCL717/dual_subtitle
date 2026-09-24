@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { migrateSettings } from '../../lib/migrate-settings';
 import { INSPECT_PLAYER, INSPECT_RESOURCES, START_DUAL, STOP_DUAL, DUAL_STATUS, isPlayerSnapshot } from '../../lib/protocol';
 import { isDualState } from '../../lib/dual';
 import { isResourceReport } from '../../lib/subtitle-resources';
@@ -11,6 +12,7 @@ import { initializeDebugPanel } from './debug-panel';
 import { previewText } from '../../lib/preview-text';
 
 async function main() {
+  await migrateSettings(browser.storage.local).catch(() => {});
   await initializeLanguage(browser.storage.local);
   initializeDebugPanel();
 
@@ -206,7 +208,7 @@ async function main() {
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       if (location.protocol !== 'chrome-extension:') {
-        status.textContent = t('当前打开的是普通网页预览，无法连接 Netflix。请加载扩展后，在 Netflix 标签页点击浏览器工具栏里的 Dul Subtitle 图标。');
+        status.textContent = t('当前打开的是普通网页预览，无法连接 Netflix。请加载扩展后，在 Netflix 标签页点击浏览器工具栏里的 Dual Subtitle 图标。');
         return;
       }
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });

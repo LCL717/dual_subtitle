@@ -37,7 +37,7 @@ export function createDebugRecorder(getState: () => { phase: string; waiting: bo
   function receive(event: MessageEvent) {
     if (event.source !== window || event.origin !== location.origin || !pending) return;
     const data = event.data;
-    if (data?.type !== 'dul:debug-clock-response:v1' || data.id !== pending.id || data.path !== pending.path) return;
+    if (data?.type !== 'dual:debug-clock-response:v1' || data.id !== pending.id || data.path !== pending.path) return;
     const now = performance.now();
     const requestMs = Math.round(now - pending.at);
     pending = undefined;
@@ -63,7 +63,7 @@ export function createDebugRecorder(getState: () => { phase: string; waiting: bo
     pending = { id: crypto.randomUUID(), at: now, path: location.pathname };
     const inspectAdUi = now - lastUiScan >= 1000;
     if (inspectAdUi) lastUiScan = now;
-    window.postMessage({ type: 'dul:clock-request:v1', id: pending.id, path: pending.path, debug: true, inspectAdUi, timingSession }, location.origin);
+    window.postMessage({ type: 'dual:clock-request:v1', id: pending.id, path: pending.path, debug: true, inspectAdUi, timingSession }, location.origin);
   }
   function cleanup() {
     clearInterval(timer); timer = undefined; pending = undefined;

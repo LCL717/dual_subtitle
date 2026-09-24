@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { migrateSettings } from '../lib/migrate-settings';
 import { hasVisibleAd } from '../lib/playback-clock';
 import { nativeSelection } from '../lib/native-selection';
 import { DEBUG_LOG } from '../lib/debug-log';
@@ -17,6 +18,7 @@ import { PREFERENCES_KEY, readPreferences, preferenceFor, matchPreferences, type
 export default defineContentScript({
   matches: ['https://www.netflix.com/*'],
   main(ctx) {
+    const settingsReady = migrateSettings(browser.storage.local).catch(() => {});
     let style = normalizeStyle(undefined);
     let styleChanged = false;
     const onStyleChange = (changes: Record<string, { newValue?: unknown }>, area: string) => {
@@ -25,7 +27,7 @@ export default defineContentScript({
       style = normalizeStyle(changes[STYLE_KEY]?.newValue);
     };
     browser.storage.onChanged.addListener(onStyleChange);
-    void browser.storage.local.get([STYLE_KEY, LEGACY_SIZE_KEY]).then(saved => {
+    void settingsReady.then(() => browser.storage.local.get([STYLE_KEY, LEGACY_SIZE_KEY])).then(saved => {
       if (!styleChanged) style = normalizeStyle(saved[STYLE_KEY] ?? { fontSize: saved[LEGACY_SIZE_KEY] });
     }).catch(() => {});
     let inspectedPath: string | undefined;
@@ -48,7 +50,7 @@ export default defineContentScript({
     let retryAt = 0;
     let disposed = false;
     let activeSelection: [string, string] | undefined;
-    const preferencesLoaded = browser.storage.local.get(PREFERENCES_KEY).then(saved => {
+    const preferencesLoaded = settingsReady.then(() => browser.storage.local.get(PREFERENCES_KEY)).then(saved => {
       if (!preferences) preferences = readPreferences(saved[PREFERENCES_KEY]);
     }).catch(() => {}).finally(() => { preferencesReady = true; });
     function savePreferences() {
@@ -107,7 +109,7 @@ export default defineContentScript({
       cancelPending?.(); cancelPending = undefined;
       removeOverlay?.(); removeOverlay = undefined;
       activeSelection = undefined;
-      window.postMessage({ type: 'dul:cancel-load:v1', id: crypto.randomUUID() }, location.origin);
+      window.postMessage({ type: 'dual:cancel-load:v1', id: crypto.randomUUID() }, location.origin);
       dual = { phase: 'off', detail: '双语字幕已关闭，原生字幕已恢复。' };
     }
     function start(ids: string[], fontSize: number) {
@@ -125,7 +127,7 @@ export default defineContentScript({
       const receive = (event: MessageEvent) => {
         if (event.source !== window || event.origin !== location.origin) return;
         const data = event.data;
-        if (data?.type !== 'dul:load-response:v1' || data.id !== id) return;
+        if (data?.type !== 'dual:load-response:v1' || data.id !== id) return;
         clean();
         if (generation !== version) return;
         if (location.pathname !== path || !video.isConnected) { dual = { phase: 'error', detail: '影片已切换，请重新开启。' }; return; }
@@ -157,7 +159,7 @@ export default defineContentScript({
       }, 18000);
       cancelPending = clean;
       window.addEventListener('message', receive);
-      window.postMessage({ type: 'dul:load-request:v1', id, ids, path }, location.origin);
+      window.postMessage({ type: 'dual:load-request:v1', id, ids, path }, location.origin);
     }
     function inspectResourceBridge(ids: string[]): Promise<ResourceReport> {
       return new Promise(resolve => {
@@ -175,12 +177,12 @@ export default defineContentScript({
         const receive = (event: MessageEvent) => {
           if (event.source !== window || event.origin !== location.origin) return;
           const data = event.data;
-          if (data?.type !== 'dul:resources-response:v1' || data.id !== id || !isResourceReport(data.report)) return;
+          if (data?.type !== 'dual:resources-response:v1' || data.id !== id || !isResourceReport(data.report)) return;
           finish(path === location.pathname ? data.report : { state: 'unavailable', tracks: [], detail: '影片已切换，请重新检测。' });
         };
         const timer = setTimeout(() => finish({ state: 'unavailable', tracks: [], detail: '资源检查超时，请刷新 Netflix 后重试。' }), 2500);
         window.addEventListener('message', receive);
-        window.postMessage({ type: 'dul:resources-request:v1', id, ids, path }, location.origin);
+        window.postMessage({ type: 'dual:resources-request:v1', id, ids, path }, location.origin);
       });
     }
     function inspectTracks(): Promise<TrackReport> {
@@ -195,7 +197,7 @@ export default defineContentScript({
         const receive = (event: MessageEvent) => {
           if (event.source !== window || event.origin !== location.origin) return;
           const data = event.data;
-          if (data?.type !== 'dul:tracks-response:v1' || data.id !== id || !isTrackReport(data.report)) return;
+          if (data?.type !== 'dual:tracks-response:v1' || data.id !== id || !isTrackReport(data.report)) return;
           finish(path === location.pathname ? data.report : {
             state: 'unavailable', tracks: [], currentTrackId: null, detail: '影片已切换，请重新检测。',
           });
@@ -203,7 +205,7 @@ export default defineContentScript({
         const timer = setTimeout(() => finish({ state: 'unavailable', tracks: [], currentTrackId: null,
           detail: '字幕桥接未响应，请在扩展管理页重新加载后刷新 Netflix。' }), 2500);
         window.addEventListener('message', receive);
-        window.postMessage({ type: 'dul:tracks-request:v1', id }, location.origin);
+        window.postMessage({ type: 'dual:tracks-request:v1', id }, location.origin);
       });
     }
     // Inspect on demand, so SPA navigation and video replacement need no polling.
