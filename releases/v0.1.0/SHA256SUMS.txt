@@ -1,2 +1,2 @@
-b7fe2a7ecf93cda5a229dc3b439491a2c11a09d3065e93663e32db2fee0e1e56  dual-0.1.0-chrome.zip
-b7fe2a7ecf93cda5a229dc3b439491a2c11a09d3065e93663e32db2fee0e1e56  dual-0.1.0-edge.zip
+3629ab59b1bdd80a2a2bb2aca98848110afc73f54a11bc0b364d0173d9f60be6  dual-0.1.0-chrome.zip
+3629ab59b1bdd80a2a2bb2aca98848110afc73f54a11bc0b364d0173d9f60be6  dual-0.1.0-edge.zip
