@@ -6,11 +6,11 @@ Watch Netflix with dual subtitles in Chrome or Edge on Windows. The first subtit
 
 ## Installation
 
-Download the v0.1.0 package for your browser:
+Download the v0.1.1 package for your browser:
 
-- [Download for Chrome](releases/v0.1.0/dual-0.1.0-chrome.zip?raw=true)
-- [Download for Edge](releases/v0.1.0/dual-0.1.0-edge.zip?raw=true)
-- [SHA-256 checksums](releases/v0.1.0/SHA256SUMS.txt)
+- [Download for Chrome](releases/v0.1.1/dual-0.1.1-chrome.zip?raw=true)
+- [Download for Edge](releases/v0.1.1/dual-0.1.1-edge.zip?raw=true)
+- [SHA-256 checksums](releases/v0.1.1/SHA256SUMS.txt)
 
 1. Download the ZIP using one of the links above. Access requires permission to this private GitHub repository.
 2. Extract the ZIP into a permanent folder. Keep this folder after installation.

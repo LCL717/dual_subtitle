@@ -6,6 +6,7 @@ export default defineConfig({
     name: 'Dual Subtitles for Netflix',
     description: 'Netflix 双语字幕工具（实验版：IMSC 文本字幕）',
     permissions: ['storage'],
-    action: { default_title: 'Dual Subtitles for Netflix' },
+    icons: { 300: 'icons/icon.png' },
+    action: { default_title: 'Dual Subtitles for Netflix', default_icon: 'icons/icon.png' },
   },
 });
